@@ -12,26 +12,29 @@ mov es, ax
 mov ss, ax
 mov sp, 0x7c00
 
-; 0xb800 是文本显示器内存区域
-mov ax, 0xb800
-mov ds, ax
-mov byte [0], 'H'
-mov byte [2], 'e'
-mov byte [4], 'l'
-mov byte [6], 'l'
-mov byte [8], 'o'
-mov byte [10], ' '
-mov byte [12], 'w'
-mov byte [14], 'o'
-mov byte [16], 'r'
-mov byte [18], 'l'
-mov byte [20], 'd'
-mov byte [22], '!'
-mov byte [24], '!'
-mov byte [26], '!'
+xchg bx, bx
+
+mov si, booting
+call print
+
 
 ; 阻塞, $表达当前行
 jmp $
+
+print:
+    mov ah, 0x0e
+.next:
+    mov al, [si]
+    cmp al, 0
+    jz .done
+    int 0x10
+    inc si
+    jmp .next
+.done:
+    ret
+
+booting:
+    db "Booting Phinix...", 10, 13, 0 ; \n\r
 
 ; 用0填充剩余区域, 512 减去末尾2字节，$$表示开始位置
 times 510 - ($- $$) db 0
