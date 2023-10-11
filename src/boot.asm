@@ -120,7 +120,7 @@ error:
     call print
     hlt ; 停机
     jmp $
-    .msg db "Booting Error|||", 10, 13, 0 ; \n\r
+    .msg db "Booting Error!!!", 10, 13, 0 ; \n\r
 
 ; 用0填充剩余区域, 512 减去末尾2字节，$$表示开始位置
 times 510 - ($- $$) db 0
