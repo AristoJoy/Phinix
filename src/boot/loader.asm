@@ -2,12 +2,12 @@
 
 dd 0x55aa ; 魔数用于判断错误
 
-; xchg bx, bx
+
 
 mov si, loading
 call print
 
-; xchg bx, bx
+
 
 detecting:
     xor ebx, ebx
@@ -44,7 +44,7 @@ detecting:
     jmp prepare_protect_mode
 
 prepare_protect_mode:
-    xchg bx, bx
+    
 
     cli ; 关闭中断
 
@@ -91,7 +91,7 @@ error:
 
 [bits 32]
 protect_mode:
-    xchg bx, bx
+    
     mov ax, data_selector
     mov ds, ax
     mov es, ax
@@ -101,11 +101,84 @@ protect_mode:
 
     mov esp, 0x10000; 修改栈顶
 
-    mov byte [0xb8000], 'P'
+    mov edi, 0x10000; 读取的目标内存
+    mov ecx, 10 ; 起始扇区
+    mov bl, 200; 扇区数量
 
-    mov byte [0x200000], 0x50
+    call read_disk
+
+    jmp dword code_selector:0x10000
+
+    ud2 ; 表示出错
 
 jmp $
+
+read_disk:
+    ; 设置读写扇区的数量
+    mov dx, 0x1f2
+    mov al, bl
+    out dx, al ; 只可以用dx和ax寄存器
+
+    inc dx ; 0x1f3
+    mov al, cl ; 起始扇区0~7位
+    out dx, al
+
+    inc dx ; 0x1f4
+    shr ecx, 8 ; 右移8位
+    mov al, cl ; 起始扇区8~15位
+    out dx, al
+
+    inc dx ; 0x1f5
+    shr ecx, 8 ; 右移8位
+    mov al, cl ; 起始扇区16~23位
+    out dx, al
+
+    inc dx ; 0x1f6
+    shr ecx, 8 ; 右移8位
+    and cl, 0xf ; 取低4位，高4位清零，起始扇区24~27位
+    mov al, 0b1110_0000; 主盘， LBA模式
+    or al, cl 
+    out dx, al
+
+    inc dx ; 0x1f7
+    mov al, 0x20 ; 读取硬盘命令
+    out dx, al
+
+    xor ecx, ecx
+    mov cl, bl ; 读取扇区的数量
+
+    .read:
+        push cx ; 里面函数修改了cx
+        call .waits ; 等待一个扇区数据准备完毕
+        call .reads ; 读取一个扇区
+        pop cx
+        loop .read
+    
+    ret
+
+    .waits:
+        mov dx, 0x1f7
+        .check:
+            in al, dx ; 读取数据到al寄存器
+            jmp $+2 ; nop 直接跳到下一行， 一点延迟
+            jmp $+2
+            jmp $+2
+            and al, 0b1000_1000 ; 只检查数据准备完或者硬盘是否繁忙，不处理错误，默认没有错
+            cmp al, 0b0000_1000 ; 0时，硬盘准备完毕，否则磁盘繁忙
+            jnz .check
+        ret
+    .reads:
+        mov dx, 0x1f0
+        mov cx, 256 ; 一个扇区256个字
+        .readw:     ; 读取一个字
+            in ax, dx
+            jmp $+2 ; nop 直接跳到下一行， 一点延迟
+            jmp $+2
+            jmp $+2
+            mov [edi], ax
+            add edi, 2
+            loop .readw
+        ret
 
 ; 段选择子, TI = 0 全局描述符，RPL = 0 最高级
 code_selector equ (1 << 3)
