@@ -6,6 +6,8 @@
 #include <phinix/stdarg.h>
 #include <phinix/printk.h>
 #include <phinix/assert.h>
+#include <phinix/debug.h>
+#include <phinix/gdt.h>
 
 // #define CRT_ADDR_REG 0x3d4
 // #define CRT_DATA_REG 0x3d5
@@ -83,9 +85,13 @@ void kernel_init()
     // }
     
 
-    assert(3 < 5);
+    // assert(3 < 5);
     // assert(3 > 5);
-    panic("Out of memory!");
+    // panic("Out of memory!");
 
+    // BOCHS_MAGIC_BP;
+    // DEBUGK("debug phinix!!!\n");
+
+    gdt_init();
     return;
 }
