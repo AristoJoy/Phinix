@@ -5,6 +5,7 @@
 #include <phinix/console.h>
 #include <phinix/stdarg.h>
 #include <phinix/printk.h>
+#include <phinix/assert.h>
 
 // #define CRT_ADDR_REG 0x3d4
 // #define CRT_DATA_REG 0x3d5
@@ -74,13 +75,17 @@ void kernel_init()
 
     // test_args(5, 1, 0xaa, 5, 0x55, 10);
 
-    int cnt = 30;
+    // int cnt = 30;
 
-    while (cnt--)
-    {
-        printk("hello phinix %#010x\n", cnt);
-    }
+    // while (cnt--)
+    // {
+    //     printk("hello phinix %#010x\n", cnt);
+    // }
     
+
+    assert(3 < 5);
+    // assert(3 > 5);
+    panic("Out of memory!");
 
     return;
 }

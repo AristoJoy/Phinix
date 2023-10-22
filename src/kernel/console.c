@@ -166,7 +166,6 @@ static void command_del()
 void console_write(char *buf, u32 count)
 {
     char ch;
-    char *ptr = (char *) pos; // 从光标位置开始输出
     while (count--)
     {
         ch = *buf++;
@@ -208,9 +207,12 @@ void console_write(char *buf, u32 count)
                 command_lf();
             }
             
-            *ptr++ = ch;    // 当前光标设置字符
-            *ptr++ = attr;    // 当前光标设置样式
-            pos += 2;
+            // 当前光标设置字符
+            *((char *)pos) = ch;
+            pos++;
+            // 当前光标设置样式
+            *((char *)pos) = attr;
+            pos++;
             x++;
             break;
         }
