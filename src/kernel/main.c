@@ -9,6 +9,7 @@
 #include <phinix/debug.h>
 #include <phinix/gdt.h>
 #include <phinix/task.h>
+#include <phinix/interrupt.h>
 
 // #define CRT_ADDR_REG 0x3d4
 // #define CRT_DATA_REG 0x3d5
@@ -94,6 +95,7 @@ void kernel_init()
     // DEBUGK("debug phinix!!!\n");
 
     gdt_init();
-    task_init();
+    // task_init();
+    interrupt_table_init();
     return;
 }

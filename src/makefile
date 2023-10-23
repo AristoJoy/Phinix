@@ -38,6 +38,8 @@ $(BUILD)/kernel.bin: \
 	$(BUILD)/kernel/debug.o  \
 	$(BUILD)/kernel/gdt.o  \
 	$(BUILD)/kernel/schedule.o  \
+	$(BUILD)/kernel/interrupt.o  \
+	$(BUILD)/kernel/handler.o  \
 	$(BUILD)/kernel/task.o  \
 	$(BUILD)/lib/string.o  \
 	$(BUILD)/lib/vsprintf.o  \
