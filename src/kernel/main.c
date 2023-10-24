@@ -10,6 +10,7 @@
 #include <phinix/gdt.h>
 #include <phinix/task.h>
 #include <phinix/interrupt.h>
+#include <phinix/stdlib.h>
 
 // #define CRT_ADDR_REG 0x3d4
 // #define CRT_DATA_REG 0x3d5
@@ -96,6 +97,19 @@ void kernel_init()
 
     gdt_init();
     // task_init();
-    interrupt_table_init();
+    interrupt_init();
+
+    asm volatile(
+        "sti\n"
+        "movl %eax, %eax\n"
+    );
+    u32 counter = 0;
+    while (true)
+    {
+        DEBUGK("looping in kernel init %d...\n", counter++);
+        delay(100000000);
+    }
+    
+
     return;
 }

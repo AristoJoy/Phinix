@@ -23,6 +23,6 @@ typedef struct gate_t
 
 typedef void *handler_t; // 中断处理函数
 
-void interrupt_table_init();
+void interrupt_init();
 
 #endif
