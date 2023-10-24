@@ -163,7 +163,7 @@ static char *number(char *str, unsigned long num, int base, int size, int precis
     }
     
     // 输出数字
-    while (--i > 0)
+    while (i-- > 0)
     {
         *ptr++ = tmp[i];
     }
