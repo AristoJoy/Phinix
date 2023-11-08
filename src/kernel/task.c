@@ -1,6 +1,7 @@
 #include <phinix/task.h>
 #include <phinix/types.h>
 #include <phinix/printk.h>
+#include <phinix/debug.h>
 
 #define PAGE_SIZE 0X1000
 
@@ -23,22 +24,23 @@ void schedule()
     task_switch(next);
 }
 
-u32 thread_a()
+u32 _ofp thread_a()
 {
+
+    asm volatile("sti\n");
     while (true)
     {
         printk("A");
-        schedule();
     }
     
 }
 
-u32 thread_b()
+u32 _ofp thread_b()
 {
+    asm volatile("sti\n");
     while (true)
     {
         printk("B");
-        schedule();
     }
 }
 

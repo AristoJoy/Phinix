@@ -7,19 +7,43 @@ section .text
 
 %macro INTERRUPT_HANDLER 2
 interrupt_handler_%1
+    xchg bx,bx
 %ifn %2
-    push 0x20131024
+    push 0x20231024
 %endif
     push %1;    // 压入中断向量，跳转到中断入口
     jmp interrupt_entry
 %endmacro
 
 interrupt_entry:
-    mov eax, [esp]
+    ; 保存上下文寄存器信息
+    push ds
+    push es
+    push fs
+    push gs
+    pusha
+
+    ; 找到前面的push %1 压入的中断向量
+    mov eax, [esp + 12 * 4]
+
+    ; 向中断处理函数传递参数
+    push eax
 
     ; 调用中断处理函数, hanlder_table中存储了中断函数的指针
     call [handler_table + eax * 4]
-    ; 对应与push %1，调用结束恢复栈
+
+    ; 对应push eax, 调用结束恢复栈
+    add esp, 4
+
+    ; 恢复上下文寄存器信息
+    popa
+    pop gs
+    pop fs
+    pop es
+    pop ds
+
+    ; 对应与push %1
+    ; 对应error code 或push magic
     add esp, 8
     iret
 
