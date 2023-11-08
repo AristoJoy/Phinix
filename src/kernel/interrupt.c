@@ -4,6 +4,7 @@
 #include <phinix/printk.h>
 #include <phinix/stdlib.h>
 #include <phinix/io.h>
+#include <phinix/assert.h>
 
 #define LOGK(fmt, args...) DEBUGK(fmt, ##args)
 
@@ -66,12 +67,41 @@ void send_eoi(int vector)
     }
 }
 
-extern void schedule();
+void set_interrupt_handler(u32 irq, handler_t handler)
+{
+    assert(irq >= 0 && irq < 16);
+    handler_table[IRQ_MASTER_NR + irq] = handler;
+}
+
+void set_interrupt_mask(u32 irq, bool enable)
+{
+    assert(irq >= 0 && irq < 16);
+    u16 port;
+    if (irq < 8)
+    {
+        port = PIC_M_DATA;
+    }
+    else
+    {
+        port = PIC_S_DATA;
+        irq -= 8;
+    }
+    if (enable)
+    {
+        out_byte(port, in_byte(port) & ~(1 << irq));
+    }
+    else
+    {
+        out_byte(port, in_byte(port) | (1 << irq));
+    }
+}
+
+u32 counter = 0;
 
 void default_handler(int vector)
 {
     send_eoi(vector);
-    schedule();
+    DEBUGK("[%x] default interrupt called %d...\n", vector, counter);
 }
 
 void exception_handler(
@@ -121,7 +151,7 @@ void pic_init()
     out_byte(PIC_S_DATA, 2);          // ICW3: 设置从片连接到主片的IR2引脚
     out_byte(PIC_S_DATA, 0b00000001); // ICW4: 8086模式，正常EOI
 
-    out_byte(PIC_M_DATA, 0b11111110); // 关闭所有中断，除了时钟中断
+    out_byte(PIC_M_DATA, 0b11111111); // 关闭所有中断
     out_byte(PIC_S_DATA, 0b11111111); // 关闭所有中断
 }
 
