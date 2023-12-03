@@ -107,7 +107,6 @@ protect_mode:
 
     call read_disk ; 读取内核
 
-    xchg bx, bx
     mov eax, 0x20231013 ; 内核魔术
     mov ebx, ards_count ; ards 数量指针
 

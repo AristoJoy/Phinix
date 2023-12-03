@@ -7,8 +7,6 @@ extern kernel_init
 
 global _start
 _start:
-    xchg bx, bx
-    push ecx; ards_addr
     push ebx; ards_count
     push eax; magic
 
