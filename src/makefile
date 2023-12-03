@@ -43,6 +43,7 @@ $(BUILD)/kernel.bin: \
 	$(BUILD)/kernel/task.o  \
 	$(BUILD)/kernel/clock.o  \
 	$(BUILD)/kernel/time.o  \
+	$(BUILD)/kernel/rtc.o  \
 	$(BUILD)/lib/string.o  \
 	$(BUILD)/lib/vsprintf.o  \
 	$(BUILD)/lib/stdlib.o  \
@@ -98,7 +99,7 @@ qemug: $(BUILD)/master.img
 	$(QEMU) -s -S
 
 $(BUILD)/master.vmdk: $(BUILD)/master.img
-	qemu-img convert -pO vmdk $< $@
+	qemu-img convert -O vmdk $< $@
 
 .PHONY: vmdk
 vmdk: $(BUILD)/master.vmdk

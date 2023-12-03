@@ -2,6 +2,7 @@
 #include <phinix/debug.h>
 #include <phinix/io.h>
 #include <phinix/stdlib.h>
+#include <phinix/rtc.h>
 
 
 #define LOGK(fmt, args...) DEBUGK(fmt, ##args);
@@ -66,12 +67,6 @@ int get_yday(tm *time)
     }
 
     return res;
-}
-
-u8 cmos_read(u8 addr)
-{
-    out_byte(CMOS_ADDR, CMOS_NMI | addr);
-    return in_byte(CMOS_DATA);
 }
 
 /**
@@ -169,6 +164,5 @@ void time_init()
         time.hour,
         time.min,
         time.sec);
-        hang();
 }
 
