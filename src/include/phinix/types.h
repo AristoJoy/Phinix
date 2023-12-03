@@ -1,15 +1,19 @@
 #ifndef PHINIX_TYPES_H
 #define PHINIX_TYPES_H
 
+#include <phinix/phinix.h>
+
 #define EOF -1 // end of file
 
 #define NULL ((void *)0) // 空指针
 
 #define EOS '\0' // 字符串结尾
 
+#ifndef __cplusplus
 #define bool _Bool
 #define true 1
 #define false 0
+#endif
 
 // 用于定义特殊的结构体
 #define _packed __attribute__((packed))
@@ -27,7 +31,7 @@ typedef long int64;
 typedef unsigned char u8;
 typedef unsigned short u16;
 typedef unsigned int u32;
-typedef unsigned long u64;
+typedef unsigned long long u64;
 
 typedef u32 time_t;
 

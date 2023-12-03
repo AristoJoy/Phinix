@@ -9,7 +9,7 @@ section .text
 interrupt_handler_%1
     xchg bx,bx
 %ifn %2
-    push 0x20231024
+    push 0x20231013
 %endif
     push %1;    // 压入中断向量，跳转到中断入口
     jmp interrupt_entry
@@ -98,7 +98,7 @@ INTERRUPT_HANDLER 0x25, 0
 INTERRUPT_HANDLER 0x26, 0    
 INTERRUPT_HANDLER 0x27, 0    
 
-INTERRUPT_HANDLER 0x28, 0    
+INTERRUPT_HANDLER 0x28, 0    ; rtc 实时时钟
 INTERRUPT_HANDLER 0x29, 0    
 INTERRUPT_HANDLER 0x2a, 0    
 INTERRUPT_HANDLER 0x2b, 0    

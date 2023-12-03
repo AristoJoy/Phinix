@@ -40,7 +40,7 @@ detecting:
 
     mov si, detect_success
     call print
-    
+
     jmp prepare_protect_mode
 
 prepare_protect_mode:
@@ -105,13 +105,15 @@ protect_mode:
     mov ecx, 10 ; 起始扇区
     mov bl, 200; 扇区数量
 
-    call read_disk
+    call read_disk ; 读取内核
+
+    xchg bx, bx
+    mov eax, 0x20231013 ; 内核魔术
+    mov ebx, ards_count ; ards 数量指针
 
     jmp dword code_selector:0x10000
 
     ud2 ; 表示出错
-
-jmp $
 
 read_disk:
     ; 设置读写扇区的数量
