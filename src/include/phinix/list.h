@@ -4,7 +4,7 @@
 #include <phinix/types.h>
 
 #define element_offset(type, member) (u32)(&((type *)0)->member)
-#define element_entry(type, memeber, ptr) (type *)((u32)ptr - element_offset(type, member))
+#define element_entry(type, member, ptr) (type *)((u32)ptr - element_offset(type, member))
 
 // 链表结点
 typedef struct list_node_t
