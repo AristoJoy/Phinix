@@ -4,6 +4,7 @@
 #include <phinix/assert.h>
 #include <phinix/stdlib.h>
 #include <phinix/string.h>
+#include <phinix/bitmap.h>
 
 #define LOGK(fmt, args...) DEBUGK(fmt, ##args)
 
@@ -23,6 +24,10 @@ static u32 KERNEL_PAGE_TABLE[] = {
     0x2000,
     0x3000,
 };
+
+#define KERNEL_MAP_BITS 0x4000
+
+bitmap_t kernel_map;
 
 #define KERNEL_MEMORY_SIZE (0x100000 * sizeof(KERNEL_PAGE_TABLE))
 
@@ -110,6 +115,11 @@ void memory_map_init()
     }
 
     LOGK("Total pages %d free page %d\n", total_pages, free_pages);
+
+    // 初始化内核虚拟内存位图，需要8位对齐
+    u32 length = ((IDX(KERNEL_MEMORY_SIZE) - IDX(MEMORY_BASE)) / 8);
+    bitmap_init(&kernel_map, (u8 *)KERNEL_MAP_BITS, length, IDX(MEMORY_BASE));
+    bitmap_scan(&kernel_map, memory_map_pages);
 }
 
 static u32 get_page()
@@ -227,8 +237,6 @@ void mapping_init()
     // 设置cr3寄存器
     set_cr3((u32)pde);
 
-    BOCHS_MAGIC_BP;
-
     // 分页启用
     enable_page();
 }
@@ -249,6 +257,54 @@ static void flush_tlb(u32 vaddr)
     asm volatile("invlpg (%0)" ::"r"(vaddr) : "memory");
 }
 
+// 从位图中扫描count个连续的页
+static u32 scan_page(bitmap_t *map, u32 count)
+{
+    assert(count > 0);
+    int32 index = bitmap_scan(map, count);
+
+    if (index == EOF)
+    {
+        panic("Scan page fail!!!");
+    }
+    
+    u32 addr = PAGE(index);
+    LOGK("Scan page 0x%p count %d\n", addr, count);
+    return addr;
+}
+
+// 与scan_page相对，重置对应的页
+static void reset_page(bitmap_t *map, u32 addr, u32 count)
+{
+    ASSERT_PAGE(addr);
+    assert(count > 0);
+    u32 index = IDX(addr);
+    for (size_t i = 0; i < count; i++)
+    {
+        assert(bitmap_test(map, index + i));
+        bitmap_set(map, index+i, false);
+    }
+    
+}
+
+// 分配count个连续的内核页
+u32 alloc_kpage(u32 count)
+{
+    assert(count > 0);
+    u32 vaddr = scan_page(&kernel_map, count);
+    LOGK("ALLOC kernel pages 0x%p count %d\n", vaddr, count);
+    return vaddr;
+}
+
+// 释放count个连续的内核页
+void free_kpage(u32 vaddr, u32 count)
+{
+    ASSERT_PAGE(vaddr);
+    assert(count > 0);
+    reset_page(&kernel_map, vaddr, count);
+    LOGK("FREE kernel pages 0x%p count %d\n", vaddr, count);
+}
+
 void memory_test()
 {
     // 测试物理内存分配
@@ -263,39 +319,52 @@ void memory_test()
     //     put_page(pages[i]);
     // }
 
-    BOCHS_MAGIC_BP;
+    // BOCHS_MAGIC_BP;
 
     // 将 20 M 0x1400000 内存映射到 64M 0x4000000 的位置
 
     // 我们还需要一个页表，0x900000
 
-    u32 vaddr = 0x4000000; // 线性地址几乎可以是任意的
-    u32 paddr = 0x1400000; // 物理地址必须要确定存在
-    u32 table = 0x900000;  // 页表也必须是物理地址
+    // u32 vaddr = 0x4000000; // 线性地址几乎可以是任意的
+    // u32 paddr = 0x1400000; // 物理地址必须要确定存在
+    // u32 table = 0x900000;  // 页表也必须是物理地址
 
-    page_entry_t *pde = get_pde();
+    // page_entry_t *pde = get_pde();
 
-    page_entry_t *dentry = &pde[DIDX(vaddr)];
-    entry_init(dentry, IDX(table));
+    // page_entry_t *dentry = &pde[DIDX(vaddr)];
+    // entry_init(dentry, IDX(table));
 
-    page_entry_t *pte = get_pte(vaddr);
-    page_entry_t *tentry = &pte[TIDX(vaddr)];
+    // page_entry_t *pte = get_pte(vaddr);
+    // page_entry_t *tentry = &pte[TIDX(vaddr)];
 
-    entry_init(tentry, IDX(paddr));
+    // entry_init(tentry, IDX(paddr));
 
-    BOCHS_MAGIC_BP;
+    // BOCHS_MAGIC_BP;
 
-    char *ptr = (char *)(0x4000000);
-    ptr[0] = 'a';
+    // char *ptr = (char *)(0x4000000);
+    // ptr[0] = 'a';
 
-    BOCHS_MAGIC_BP;
+    // BOCHS_MAGIC_BP;
 
-    entry_init(tentry, IDX(0x1500000));
-    flush_tlb(vaddr);
+    // entry_init(tentry, IDX(0x1500000));
+    // flush_tlb(vaddr);
 
-    BOCHS_MAGIC_BP;
+    // BOCHS_MAGIC_BP;
 
-    ptr[2] = 'b';
+    // ptr[2] = 'b';
 
-    BOCHS_MAGIC_BP;
+    // BOCHS_MAGIC_BP;
+
+    u32 *pages = (u32 *)(0x200000);
+    u32 count = 0x6fe;
+    for (size_t i = 0; i < count; i++)
+    {
+        pages[i] = alloc_kpage(1);
+        LOGK("0x%x\n", i);
+    }
+
+    for (size_t i = 0; i < count; i++)
+    {
+        free_kpage(pages[i], 1);
+    }
 }

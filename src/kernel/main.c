@@ -19,12 +19,12 @@ void kernel_init()
     // rtc_init();
     // task_init();
 
-    bitmap_tests();
+    // bitmap_tests();
 
     // char *ptr = (char*) (0x100000 * 20);
     // ptr[0] = 'a';
 
-    // memory_test();
+    memory_test();
     // asm volatile("sti");
     hang();
     return;
