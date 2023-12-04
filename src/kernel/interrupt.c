@@ -51,7 +51,7 @@ static char *messages[] = {
 
 /**
  * @brief 发送中断结束指令
- * 
+ *
  * @param vector 中断向量号
  */
 void send_eoi(int vector)
@@ -96,12 +96,46 @@ void set_interrupt_mask(u32 irq, bool enable)
     }
 }
 
-u32 counter = 0;
+// 清除eflags IF位，并返回设置之前的值
+bool interrupt_disable()
+{
+    asm volatile(
+        "pushfl\n"        // 将eflags压入栈
+        "cli\n"           // 清除IF位 此时外中断已被屏蔽
+        "popl %eax\n"     // 弹出eflags到eax
+        "shrl $9, %eax\n" // 将eax右移9位，得到IF位
+        "andl $1, %eax\n" // 清除其他位
+    );
+}
+
+// 获得IF位
+bool get_interrupt_state()
+{
+    asm volatile(
+        "pushfl\n"        // 将eflags压入栈
+        "popl %eax\n"     // 弹出eflags到eax
+        "shrl $9, %eax\n" // 将eax右移9位，得到IF位
+        "andl $1, %eax\n" // 清除其他位
+    );
+}
+
+// 设置IF位
+void set_interrupt_state(bool state)
+{
+    if (state)
+    {
+        asm volatile("sti\n");
+    }
+    else
+    {
+        asm volatile("cli\n");
+    }
+}
 
 void default_handler(int vector)
 {
     send_eoi(vector);
-    DEBUGK("[%x] default interrupt called %d...\n", vector, counter);
+    DEBUGK("[%x] default interrupt called\n", vector);
 }
 
 void exception_handler(
