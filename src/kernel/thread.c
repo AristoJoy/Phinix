@@ -21,15 +21,22 @@ void idle_thread()
     
 }
 
+#include <phinix/mutex.h>
+
+mutex_t mutex;
+
 void init_thread()
 {
+    mutex_init(&mutex);
     set_interrupt_state(true);
     u32 counter = 0;
 
     while (true)
     {
+        mutex_lock(&mutex);
         LOGK("init task %d...\n", counter++);
-        sleep(500);
+        // sleep(500);
+        mutex_unlock(&mutex);
     }
     
 }
@@ -41,7 +48,9 @@ void test_thread()
 
     while (true)
     {
+        mutex_lock(&mutex);
         LOGK("test task %d...\n", counter++);
-        sleep(709);
+        // sleep(709);
+        mutex_unlock(&mutex);
     }
 }

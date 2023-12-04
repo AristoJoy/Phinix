@@ -167,7 +167,7 @@ extern void start_beep();
 void console_write(char *buf, u32 count)
 {
     // 关闭中断
-    bool intr = interrupt_disable();
+    // bool intr = interrupt_disable();
 
     char ch;
     while (count--)
@@ -224,7 +224,7 @@ void console_write(char *buf, u32 count)
     set_cursor();
     
     // 打开中断
-    set_interrupt_state(intr);
+    // set_interrupt_state(intr);
 }
 
 void console_init()
