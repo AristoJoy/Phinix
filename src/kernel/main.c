@@ -21,10 +21,10 @@ void kernel_init()
 
     BOCHS_MAGIC_BP;
 
-    char *ptr = (char*) (0x100000 * 20);
-    ptr[0] = 'a';
+    // char *ptr = (char*) (0x100000 * 20);
+    // ptr[0] = 'a';
 
-    // memory_test();
+    memory_test();
     // asm volatile("sti");
     hang();
     return;
