@@ -2,6 +2,8 @@
 #include <phinix/syscall.h>
 #include <phinix/debug.h>
 #include <phinix/task.h>
+#include <phinix/stdio.h>
+
 
 
 #define LOGK(fmt, args...) DEBUGK(fmt, ##args)
@@ -42,7 +44,7 @@ static void real_init_thread()
         // set_interrupt_state(intr);
         // LOGK("init task %d...\n", counter++);
         sleep(100);
-
+        printf("task is in user mode %d\n", counter++);
     }
     
 }
