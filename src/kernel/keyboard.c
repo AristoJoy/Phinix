@@ -2,6 +2,9 @@
 #include <phinix/io.h>
 #include <phinix/assert.h>
 #include <phinix/debug.h>
+#include <phinix/mutex.h>
+#include <phinix/task.h>
+#include <phinix/fifo.h>
 
 #define LOGK(fmt, args...) DEBUGK(fmt, ##args)
 
@@ -220,6 +223,13 @@ static char keymap[][4] = {
     /* 0x5F */ {INV, INV, false, false}, // PrintScreen
 };
 
+static lock_t lock; // 锁
+static task_t *waiter; // 等待输入的任务
+
+#define BUFFER_SIZE 64 // 输入缓冲区大小
+static char buf[BUFFER_SIZE]; // 输入缓冲区
+static fifo_t fifo; // 循环队列
+
 static bool capslock_state; // 大写锁定
 static bool scrlock_state; // 滚动锁定
 static bool numlock_state; // 数字锁定
@@ -380,8 +390,31 @@ void keyboard_handler(int vector)
         return;
     }
     
-    LOGK("keydown %c \n", ch);
-    
+    // LOGK("keydown %c \n", ch);
+    fifo_put(&fifo, ch);
+    if (waiter != NULL)
+    {
+        task_unblock(waiter);
+        waiter = NULL;
+    }
+
+}
+
+u32 keyboard_read(char *buf, u32 count)
+{
+    lock_acquire(&lock);
+    int nr = 0;
+    while (nr < count)
+    {
+        while (fifo_empty(&fifo))
+        {
+            waiter = running_task();
+            task_block(waiter, NULL, TASK_WAITING);
+        }
+        buf[nr++] = fifo_get(&fifo);
+    }
+    lock_release(&lock);
+    return count;
 }
 
 void keyboard_init()
@@ -390,6 +423,10 @@ void keyboard_init()
     scrlock_state = false;
     numlock_state = false;
     extcode_state = false;
+
+    fifo_init(&fifo, buf,BUFFER_SIZE);
+    lock_init(&lock);
+    waiter = NULL;
 
     set_leds();
 

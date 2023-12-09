@@ -26,22 +26,25 @@ void idle_thread()
 // mutex_t mutex;
 // lock_t lock;
 
+extern u32 keyboard_read(char *buf, u32 count);
+
 void init_thread()
 {
     // mutex_init(&mutex);
     // lock_init(&lock);
     set_interrupt_state(true);
     u32 counter = 0;
-
+    char ch;
     while (true)
     {
-        // mutex_lock(&mutex);
-        // lock_acquire(&lock);
+        bool intr = interrupt_disable();
+        keyboard_read(&ch, 1);
+        printk("%c", ch);
 
+        set_interrupt_state(intr);
         // LOGK("init task %d...\n", counter++);
-        sleep(500);
-        // mutex_unlock(&mutex);
-        // lock_release(&lock);
+        // sleep(500);
+
     }
     
 }
@@ -53,12 +56,8 @@ void test_thread()
 
     while (true)
     {
-        // mutex_lock(&mutex);
-        // lock_acquire(&lock);
-
         // LOGK("test task %d...\n", counter++);
         sleep(709);
-        // mutex_unlock(&mutex);
-        // lock_release(&lock);
+
     }
 }
