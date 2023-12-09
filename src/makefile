@@ -56,7 +56,8 @@ $(BUILD)/kernel.bin: \
 	$(BUILD)/kernel/time.o  \
 	$(BUILD)/kernel/rtc.o  \
 	$(BUILD)/kernel/memory.o \
-	$(BUILD)/kernel/bitmap.o \
+	$(BUILD)/kernel/keyboard.o \
+	$(BUILD)/lib/bitmap.o \
 	$(BUILD)/lib/string.o  \
 	$(BUILD)/lib/vsprintf.o  \
 	$(BUILD)/lib/stdlib.o  \
