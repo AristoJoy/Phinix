@@ -9,17 +9,20 @@
 #include <phinix/bitmap.h>
 #include <phinix/syscall.h>
 #include <phinix/list.h>
+#include <phinix/gdt.h>
 
 #define NR_TASK 64
 
 extern u32 volatile jiffies;
 extern u32 jiffy;
 extern bitmap_t kernel_map;
+extern tss_t tss;
+
 extern void task_switch(task_t *next);
 
-static task_t *task_table[NR_TASK];  // 任务表
-static list_t block_list;       // 任务默认阻塞链表
-static list_t sleep_list;      // 任务睡眠链表
+static task_t *task_table[NR_TASK]; // 任务表
+static list_t block_list;           // 任务默认阻塞链表
+static list_t sleep_list;           // 任务睡眠链表
 
 static task_t *idle_task; // 基础任务
 
@@ -73,7 +76,6 @@ static task_t *task_search(task_state_t state)
     {
         task = idle_task;
     }
-    
 
     return task;
 }
@@ -94,7 +96,7 @@ void task_block(task_t *task, list_t *blist, task_state_t state)
     {
         blist = &block_list;
     }
-    
+
     list_push(blist, &task->node);
     assert(state != TASK_READY && state != TASK_RUNNING);
 
@@ -105,7 +107,6 @@ void task_block(task_t *task, list_t *blist, task_state_t state)
     {
         schedule();
     }
-    
 }
 
 void task_unblock(task_t *task)
@@ -124,9 +125,9 @@ void task_sleep(u32 ms)
 {
     assert(!get_interrupt_state());
 
-    u32 ticks = ms / jiffy;  // 需要睡眠的时间片
+    u32 ticks = ms / jiffy;        // 需要睡眠的时间片
     ticks = ticks > 0 ? ticks : 1; // 至少休眠一个时间片
-    
+
     // 记录目标全局时间片
     task_t *current = running_task();
     current->ticks = jiffies + ticks;
@@ -144,13 +145,12 @@ void task_sleep(u32 ms)
             anchor = ptr;
             break;
         }
-        
     }
 
     assert(current->node.next == NULL);
     assert(current->node.prev == NULL);
 
-        // 插入连
+    // 插入连
     list_insert_before(anchor, &current->node);
 
     // 阻塞状态是睡眠
@@ -158,7 +158,6 @@ void task_sleep(u32 ms)
 
     // 调度执行其他任务
     schedule();
-
 }
 
 void task_wakeup()
@@ -167,21 +166,32 @@ void task_wakeup()
 
     // 从睡眠链表中找到ticks小于等于jiffies的任务，恢复执行
     list_t *list = &sleep_list;
-    for (list_node_t *ptr = list->head.next; ptr != &list->tail; )
+    for (list_node_t *ptr = list->head.next; ptr != &list->tail;)
     {
         task_t *task = element_entry(task_t, node, ptr);
         if (task->ticks > jiffies)
         {
             break;
         }
-        
+
         // unblock 会将指针清空，所以需要提前取next
         ptr = ptr->next;
-        
+
         task->ticks = 0;
         task_unblock(task);
     }
-    
+}
+
+// 激活任务
+void task_activate(task_t *task)
+{
+    assert(task->magic == PHINIX_MAGIC);
+
+    // 用户态切换回内核态，将栈顶切换成内核栈顶
+    if (task->uid != KERNEL_USER)
+    {
+        tss.esp0 = (u32)task + PAGE_SIZE;
+    }   
 }
 
 task_t *running_task()
@@ -199,7 +209,7 @@ void schedule()
     task_t *next = task_search(TASK_READY);
     assert(next != NULL);
     assert(next->magic == PHINIX_MAGIC);
-    if (current-> state == TASK_RUNNING)
+    if (current->state == TASK_RUNNING)
     {
         current->state = TASK_READY;
     }
@@ -208,7 +218,8 @@ void schedule()
     {
         return;
     }
-    
+
+    task_activate(next);
     task_switch(next);
 }
 
@@ -232,13 +243,54 @@ static task_t *task_create(target_t target, const char *name, u32 priority, u32 
     task->priority = priority;
     task->ticks = priority;
     task->jiffies = 0;
-    task->state=TASK_READY;
+    task->state = TASK_READY;
     task->uid = uid;
     task->vmap = &kernel_map;
     task->pde = KERNEL_PAGE_DIR;
     task->magic = PHINIX_MAGIC;
 
     return task;
+}
+
+// 切换回用户模式
+void task_to_user_mode(target_t target)
+{
+    task_t *task = running_task();
+
+    u32 addr = (u32)task + PAGE_SIZE;
+
+    addr -= sizeof(intr_frame_t);
+    intr_frame_t *iframe = (intr_frame_t *)(addr);
+
+    iframe->vector = 0x20;
+    iframe->edi = 1;
+    iframe->esi = 2;
+    iframe->ebp = 3;
+    iframe->esp_dummy = 4;
+    iframe->ebx = 5;
+    iframe->edx = 6;
+    iframe->ecx = 7;
+    iframe->eax = 8;
+
+    iframe->gs = 0;
+    iframe->ds = USER_DATA_SELECTOR;
+    iframe->es = USER_DATA_SELECTOR;
+    iframe->fs = USER_DATA_SELECTOR;
+    iframe->ss = USER_DATA_SELECTOR;
+    iframe->cs = USER_CODE_SELECTOR;
+
+    iframe->error = PHINIX_MAGIC;
+
+    u32 stack3 = alloc_kpage(1); // todo 替换为用户栈
+
+    iframe->eip = (u32)target;
+    iframe->eflags = (0 << 12 | 0b10 | 1 << 9); // IOPL 为0 IF 为1
+
+    iframe->esp = stack3 + PAGE_SIZE;
+
+    asm volatile(
+        "movl %0, %%esp\n"
+        "jmp interrupt_exit\n" ::"m"(iframe));
 }
 
 static void task_setup()
@@ -249,7 +301,6 @@ static void task_setup()
 
     memset(task_table, 0, sizeof(task_table));
 }
-
 
 extern void idle_thread();
 extern void init_thread();

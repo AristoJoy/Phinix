@@ -1,6 +1,8 @@
 #include <phinix/interrupt.h>
 #include <phinix/syscall.h>
 #include <phinix/debug.h>
+#include <phinix/task.h>
+
 
 #define LOGK(fmt, args...) DEBUGK(fmt, ##args)
 
@@ -28,25 +30,29 @@ void idle_thread()
 
 extern u32 keyboard_read(char *buf, u32 count);
 
-void init_thread()
+static void real_init_thread()
 {
-    // mutex_init(&mutex);
-    // lock_init(&lock);
-    set_interrupt_state(true);
+
     u32 counter = 0;
     char ch;
     while (true)
     {
-        bool intr = interrupt_disable();
-        keyboard_read(&ch, 1);
-        printk("%c", ch);
-
-        set_interrupt_state(intr);
+        BOCHS_MAGIC_BP;
+        // asm volatile("in $0x92, %ax\n");
+        // set_interrupt_state(intr);
         // LOGK("init task %d...\n", counter++);
-        // sleep(500);
+        sleep(100);
 
     }
     
+}
+
+// 初始化线程
+void init_thread()
+{
+    // set_interrupt_state(true);
+    char temp[100]; // 为了栈顶有充足的空间，用于存储栈中的局部变量，不和intr_iframe_t冲突
+    task_to_user_mode(real_init_thread);
 }
 
 void test_thread()

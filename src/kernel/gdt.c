@@ -87,8 +87,7 @@ void tss_init()
     desc->DPL = 0;         // 用于任务门或调用门
     desc->type = 0b1001;   // 32位 可用tss
 
-    BOCHS_MAGIC_BP;
-    
+    // BOCHS_MAGIC_BP;
     asm volatile(
         "ltr %%ax\n" ::"a"(KERNEL_TSS_SELECTOR));
 }
