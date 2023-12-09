@@ -8,6 +8,9 @@
 #define KEYBOARD_DATA_PORT 0x60
 #define KEYBOARD_CTRL_PORT 0x64
 
+#define KEYBOARD_CMD_LED 0xED // 设置LED状态
+#define KEYBOARD_CMD_ACK 0xFA // ACK
+
 #define INV 0 // 不可见字符
 
 #define CODE_PRINT_SCREEN_DOWN 0xB7
@@ -231,6 +234,43 @@ static bool extcode_state; // 扩展码状态
 // SHIFT键状态
 #define shift_state (keymap[KEY_SHIFT_L][2] || keymap[KEY_SHIFT_R][2])
 
+// 等待键盘缓冲区为空
+static void keyboard_wait()
+{
+    u8 state;
+    do
+    {
+        state = in_byte(KEYBOARD_CTRL_PORT);
+    } while (state & 0x02); // 读取键盘缓冲区，直到为空
+    
+}
+
+// 等待键盘ack
+static void keyboard_ack()
+{
+    u8 state;
+    do
+    {
+        state = in_byte(KEYBOARD_DATA_PORT);
+    } while (state != KEYBOARD_CMD_ACK);
+    
+}
+
+// 设置led灯状态
+static void set_leds()
+{
+    u8 leds = (capslock_state << 2) | (numlock_state << 1) | scrlock_state;
+    keyboard_wait();
+    // 设置LED灯命令
+    out_byte(KEYBOARD_DATA_PORT, KEYBOARD_CMD_LED);
+    keyboard_ack();
+
+    keyboard_wait();
+    // 设置LED灯状态
+    out_byte(KEYBOARD_DATA_PORT, leds);
+    keyboard_ack();
+}
+
 void keyboard_handler(int vector)
 {
     assert(vector == 0x21);
@@ -305,10 +345,15 @@ void keyboard_handler(int vector)
         led = true;
     }
 
+    if (led)
+    {
+        set_leds();
+    }
+    
     // 计算shift状态
     bool shift = false;
-    // 大写锁定打开，shift状态取反
-    if (capslock_state)
+    // 大写锁定打开，shift状态取反（只对字幕有效）
+    if (capslock_state && ('a' <= keymap[makecode][0] <= 'z'))
     {
         shift = !shift;
     }
@@ -345,6 +390,8 @@ void keyboard_init()
     scrlock_state = false;
     numlock_state = false;
     extcode_state = false;
+
+    set_leds();
 
     set_interrupt_handler(IRQ_KEYBOARD, keyboard_handler);
     set_interrupt_mask(IRQ_KEYBOARD, true);
