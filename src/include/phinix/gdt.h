@@ -1,7 +1,15 @@
 #ifndef PHINIX_GDT_H
 #define PHINIX_GDT_H
 
+#include <phinix/types.h>
+
 #define GDT_SIZE 8192
+
+#define KERNEL_CODE_IDX 1
+#define KERNEL_DATA_IDX 2
+
+#define KERNEL_CODE_SELECTOR (KERNEL_CODE_IDX << 3)
+#define KERNEL_DATA_SELECTOR (KERNEL_DATA_IDX << 3)
 
 #include <phinix/types.h>
 
