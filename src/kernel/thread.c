@@ -32,19 +32,15 @@ void idle_thread()
 
 extern u32 keyboard_read(char *buf, u32 count);
 
-static void real_init_thread()
+static void user_init_thread()
 {
 
     u32 counter = 0;
     char ch;
     while (true)
     {
-        BOCHS_MAGIC_BP;
-        // asm volatile("in $0x92, %ax\n");
-        // set_interrupt_state(intr);
-        // LOGK("init task %d...\n", counter++);
-        sleep(100);
-        // printf("task is in user mode %d\n", counter++);
+        test(); 
+        sleep(1000);
     }
     
 }
@@ -54,7 +50,7 @@ void init_thread()
 {
     // set_interrupt_state(true);
     char temp[100]; // 为了栈顶有充足的空间，用于存储栈中的局部变量，不和intr_iframe_t冲突
-    task_to_user_mode(real_init_thread);
+    task_to_user_mode(user_init_thread);
 }
 
 void test_thread()
@@ -65,19 +61,7 @@ void test_thread()
     while (true)
     {
         // LOGK("test task %d...\n", counter++);
-        void *ptr = kmalloc(1200);
-        LOGK("kmalloc 0x%p...\n", ptr);
-        kfree(ptr);
-
-        ptr = kmalloc(1024);
-        LOGK("kmalloc 0x%p...\n", ptr);
-        kfree(ptr);
-
-        ptr = kmalloc(54);
-        LOGK("kmalloc 0x%p...\n", ptr);
-        kfree(ptr);
-
-        sleep(5000);
+        sleep(2000);
 
     }
 }

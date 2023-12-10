@@ -4,6 +4,7 @@
 #include <phinix/syscall.h>
 #include <phinix/task.h>
 #include <phinix/console.h>
+#include <phinix/memory.h>
 
 
 #define LOGK(fmt, args...) DEBUGK(fmt, ##args)
@@ -31,17 +32,21 @@ task_t *task = NULL;
 static u32 sys_test()
 {
     // LOGK("syscall test...\n");
-    if (!task)
-    {
-        task = running_task();
-        task_block(task, NULL, TASK_BLOCKED);
-    }
-    else
-    {
-        task_unblock(task);
-        task = NULL;
-    }
+
+    BOCHS_MAGIC_BP;
+    link_page(0x1600000);
+
+    BOCHS_MAGIC_BP;
+
+    char *ptr = (char *)0x1600000;
+    ptr[3] = 'T';
+
+    BOCHS_MAGIC_BP;
     
+    unlink_page(0x1600000);
+
+    BOCHS_MAGIC_BP;
+
     return 255;
 }
 
