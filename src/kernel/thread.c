@@ -44,7 +44,7 @@ static void real_init_thread()
         // set_interrupt_state(intr);
         // LOGK("init task %d...\n", counter++);
         sleep(100);
-        printf("task is in user mode %d\n", counter++);
+        // printf("task is in user mode %d\n", counter++);
     }
     
 }
@@ -65,7 +65,19 @@ void test_thread()
     while (true)
     {
         // LOGK("test task %d...\n", counter++);
-        sleep(709);
+        void *ptr = kmalloc(1200);
+        LOGK("kmalloc 0x%p...\n", ptr);
+        kfree(ptr);
+
+        ptr = kmalloc(1024);
+        LOGK("kmalloc 0x%p...\n", ptr);
+        kfree(ptr);
+
+        ptr = kmalloc(54);
+        LOGK("kmalloc 0x%p...\n", ptr);
+        kfree(ptr);
+
+        sleep(5000);
 
     }
 }
