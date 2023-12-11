@@ -33,18 +33,9 @@ static void user_init_thread()
     while (true)
     {
         // test(); 
-        BOCHS_MAGIC_BP;
-        char *ptr = (char *)0x900000;
-        brk(ptr);
-
-        BOCHS_MAGIC_BP;
-        ptr -=0x1000;
-        ptr[3] = 0xff;
-
-        BOCHS_MAGIC_BP;
-        brk((char *)0x800000);
+        printf("init thread %d %d %d...\n", getpid(), getppid(), counter++);
         
-        sleep(10000);
+        sleep(1000);
         // printf("task in in user mode %d\n, counter++");
     }
     
@@ -65,7 +56,8 @@ void test_thread()
 
     while (true)
     {
-        LOGK("test task %d...\n", counter++);
+        printf("test thread %d %d %d...\n", getpid(), getppid(), counter++);
+
         // BOCHS_MAGIC_BP;
         sleep(2000);
 

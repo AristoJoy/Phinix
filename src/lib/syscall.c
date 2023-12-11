@@ -57,6 +57,18 @@ void sleep(u32 ms)
     _syscall1(SYS_NR_SLEEP, ms);
 }
 
+// 获取任务id
+pid_t getpid()
+{
+    return _syscall0(SYS_NR_GETPID);
+}
+
+// 获取父任务id
+pid_t getppid()
+{
+    return _syscall0(SYS_NR_GETPPID);
+}
+
 // brk调用
 int32 brk(void *addr)
 {

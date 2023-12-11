@@ -32,6 +32,8 @@ typedef struct task_t
     u32 jiffies; // 上次执行时的全局时间片
     char name[TASK_NAME_LEN]; // 任务名
     u32 uid;       // 用户id
+    pid_t pid;      // 任务id
+    pid_t ppid;     // 父任务id
     u32 pde;        // 页目录物理地址
     struct bitmap_t *vmap; // 进程虚拟内存位图
     u32 brk;        // 进程堆内存最高地址
@@ -93,5 +95,11 @@ void task_wakeup();
 
 // 切换回用户模式
 void task_to_user_mode(target_t target);
+
+// 获取任务id
+pid_t sys_getpid();
+
+// 获取父任务id
+pid_t sys_getppid();
 
 #endif

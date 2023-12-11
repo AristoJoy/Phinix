@@ -38,6 +38,8 @@ typedef unsigned long long u64;
 typedef u32 time_t;
 typedef u32 idx_t;
 
+typedef int32 pid_t;
+
 typedef int32 fd_t;
 // 标准文件描述符
 typedef enum std_fd_t
