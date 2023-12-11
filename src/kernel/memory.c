@@ -487,6 +487,22 @@ void unlink_page(u32 vaddr)
     flush_tlb(vaddr);
 }
 
+// 拷贝一页，返回物理地址
+static u32 copy_page(void *page)
+{
+    u32 paddr = get_page();
+
+    // 利用0这一项页表没有被初始化，拷贝数据后
+    page_entry_t *entry = get_pte(0, false);
+    entry_init(entry, IDX(paddr));
+    // 访问0对应的虚拟地址，也就是paddr，将page的一页数据拷贝到paddr上
+    memcpy((void *)0, (void *)page, PAGE_SIZE);
+
+    // 将这一页表项还原回去
+    entry->present = false;
+    return paddr;
+}
+
 // 拷贝pde
 page_entry_t *copy_pde()
 {
@@ -498,6 +514,42 @@ page_entry_t *copy_pde()
     page_entry_t *entry = &pde[1023];
     // 这里由于从内核分配，物理地址和线性地址相同所以使用pde的idx
     entry_init(entry, IDX(pde));
+
+    page_entry_t *dentry;
+
+    // 0 和1 是内核态的8M内存，下面拷贝的是用户态的页目录
+    for (size_t didx = 2; didx < 1023; didx++)
+    {
+        dentry = &pde[didx];
+        if (!dentry->present)
+        {
+            continue;
+        }
+        page_entry_t *pte = (page_entry_t *)(PDE_MASK | (didx << 12));
+
+        for (size_t tidx = 0; tidx < 1024; tidx++)
+        {
+            entry = &pte[tidx];
+            if (!entry->present)
+            {
+                continue;
+            }
+            
+            // 对应的物理内存引用大于0
+            assert(memory_map[entry->index] > 0);
+            // 置为只读
+            entry->write = false;
+            // 对应的物理页引用加1
+            memory_map[entry->index]++;
+
+            assert(memory_map[entry->index] < 255);
+        }
+        
+        u32 paddr = copy_page((pte));
+        dentry->index = IDX(paddr);
+    }
+    
+    set_cr3(task->pde);
 
     return pde;
 }
@@ -566,12 +618,41 @@ void page_fault(
     LOGK("fault address 0x%p...\n", vaddr);
 
     // 转换错误码
-    page_error_code_t *code = (page_error_code_t *)&code;
+    page_error_code_t *code = (page_error_code_t *)&error;
 
     // 获取当前执行的任务
     task_t *task = running_task();
 
     assert(KERNEL_MEMORY_SIZE <= vaddr < USER_STACK_TOP);
+
+    // 用户只读内存(写时复制)
+    if (code->present)
+    {
+        // 由于写内存导致的缺页异常
+        assert(code->write);
+
+        page_entry_t *pte = get_pte(vaddr, false);
+        page_entry_t *entry = &pte[TIDX(vaddr)];
+
+        assert(entry->present);
+        assert(memory_map[entry->index] > 0);
+        if (memory_map[entry->index] == 1)
+        {
+            entry->write = true;
+            LOGK("WRITE page for 0x%p\n", vaddr);
+        }
+        else
+        {
+            void *page = (void *)PAGE(IDX(vaddr));
+            u32 paddr = copy_page(page);
+            memory_map[entry->index]--;
+            entry_init(entry, IDX(paddr));
+            flush_tlb(vaddr);
+            LOGK("COPY page for 0x%p\n", vaddr);
+        }
+        return;
+    }
+    
 
     // 分配用户栈或堆内存
     if (!code->present && (vaddr < task->brk || vaddr >= USER_STACK_BOTTOM))
