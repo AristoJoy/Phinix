@@ -43,8 +43,8 @@ static void user_init_thread()
         else
         {
             printf("fork after child %d %d %d...\n", pid, getpid(), getppid());
+            exit(0);
         }
-        hang();
 
         sleep(1000);
         // printf("task in in user mode %d\n, counter++");
