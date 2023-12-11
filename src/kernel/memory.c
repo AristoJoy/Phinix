@@ -517,6 +517,40 @@ typedef struct page_error_code_t
     u16 reserved2;
 } _packed page_error_code_t;
 
+// 系统调用brk
+int32 sys_brk(void *addr)
+{
+    LOGK("task brk 0x%p\n", addr);
+    u32 brk = (u32)addr;
+
+    ASSERT_PAGE(brk);
+
+    task_t *task = running_task();
+
+    assert(task->uid != KERNEL_USER);
+
+    assert(KERNEL_MEMORY_SIZE < brk < USER_STACK_BOTTOM);
+
+    u32 old_brk = task->brk;
+
+    if (old_brk > brk)
+    {
+        // 需要释放内存
+        for(; brk < old_brk; brk += PAGE_SIZE)
+        {
+            unlink_page(brk);
+        }
+    }
+    else if (IDX(brk - old_brk) > free_pages)
+    {
+        // out of memory
+        return -1;
+    }
+    task->brk = brk;
+    
+    return 0;
+}
+
 // 缺页中断处理
 void page_fault(
     int vector,
@@ -539,8 +573,8 @@ void page_fault(
 
     assert(KERNEL_MEMORY_SIZE <= vaddr < USER_STACK_TOP);
 
-    // 分配用户栈
-    if (!code->present && (vaddr > USER_STACK_BOTTOM))
+    // 分配用户栈或堆内存
+    if (!code->present && (vaddr < task->brk || vaddr >= USER_STACK_BOTTOM))
     {
         // 获取页的开始地址
         u32 page = PAGE(IDX(vaddr));

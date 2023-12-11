@@ -60,4 +60,7 @@ void unlink_page(u32 vaddr);
 // 拷贝pde
 page_entry_t *copy_pde();
 
+// 系统调用brk
+int32 sys_brk(void *addr);
+
 #endif

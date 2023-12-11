@@ -25,13 +25,6 @@ void idle_thread()
     
 }
 
-
-void test_recursion()
-{
-    char tmp[0x400];
-    test_recursion();
-}
-
 static void user_init_thread()
 {
 
@@ -40,10 +33,19 @@ static void user_init_thread()
     while (true)
     {
         // test(); 
-        printf("task in in user mode %d\n, counter++");
         BOCHS_MAGIC_BP;
-        // test_recursion();
-        sleep(1000);
+        char *ptr = (char *)0x900000;
+        brk(ptr);
+
+        BOCHS_MAGIC_BP;
+        ptr -=0x1000;
+        ptr[3] = 0xff;
+
+        BOCHS_MAGIC_BP;
+        brk((char *)0x800000);
+        
+        sleep(10000);
+        // printf("task in in user mode %d\n, counter++");
     }
     
 }
@@ -64,7 +66,7 @@ void test_thread()
     while (true)
     {
         LOGK("test task %d...\n", counter++);
-        BOCHS_MAGIC_BP;
+        // BOCHS_MAGIC_BP;
         sleep(2000);
 
     }

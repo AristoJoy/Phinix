@@ -57,6 +57,12 @@ void sleep(u32 ms)
     _syscall1(SYS_NR_SLEEP, ms);
 }
 
+// brk调用
+int32 brk(void *addr)
+{
+    return _syscall1(SYS_NR_BRK, (u32) addr);
+}
+
 // 系统调用write
 int32 write(fd_t fd, char *buf, u32 len)
 {
