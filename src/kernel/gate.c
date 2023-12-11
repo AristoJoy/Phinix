@@ -31,22 +31,6 @@ task_t *task = NULL;
 
 static u32 sys_test()
 {
-    // LOGK("syscall test...\n");
-
-    BOCHS_MAGIC_BP;
-    link_page(0x1600000);
-
-    BOCHS_MAGIC_BP;
-
-    char *ptr = (char *)0x1600000;
-    ptr[3] = 'T';
-
-    BOCHS_MAGIC_BP;
-    
-    unlink_page(0x1600000);
-
-    BOCHS_MAGIC_BP;
-
     return 255;
 }
 

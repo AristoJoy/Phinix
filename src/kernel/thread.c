@@ -25,12 +25,12 @@ void idle_thread()
     
 }
 
-// #include <phinix/mutex.h>
 
-// mutex_t mutex;
-// lock_t lock;
-
-extern u32 keyboard_read(char *buf, u32 count);
+void test_recursion()
+{
+    char tmp[0x400];
+    test_recursion();
+}
 
 static void user_init_thread()
 {
@@ -39,7 +39,10 @@ static void user_init_thread()
     char ch;
     while (true)
     {
-        test(); 
+        // test(); 
+        printf("task in in user mode %d\n, counter++");
+        BOCHS_MAGIC_BP;
+        // test_recursion();
         sleep(1000);
     }
     
@@ -60,7 +63,8 @@ void test_thread()
 
     while (true)
     {
-        // LOGK("test task %d...\n", counter++);
+        LOGK("test task %d...\n", counter++);
+        BOCHS_MAGIC_BP;
         sleep(2000);
 
     }

@@ -188,6 +188,13 @@ void task_activate(task_t *task)
 {
     assert(task->magic == PHINIX_MAGIC);
 
+    if (task->pde != get_cr3())
+    {
+        set_cr3(task->pde);
+        // BOCHS_MAGIC_BP;
+    }
+    
+
     // 用户态切换回内核态，将栈顶切换成内核栈顶
     if (task->uid != KERNEL_USER)
     {
@@ -258,10 +265,14 @@ void task_to_user_mode(target_t target)
 {
     task_t *task = running_task();
 
-    // 进入到用户空间，不能使用内核的vmap
+    // 创建用户进程虚拟内存位图
     task->vmap = kmalloc(sizeof(bitmap_t)); // todo kfree
     void *buf = (void *)alloc_kpage(1); // todo free_kpage 只能表示128M的空间
     bitmap_init(task->vmap, buf, PAGE_SIZE, KERNEL_MEMORY_SIZE / PAGE_SIZE);
+
+    // 创建用户进程页表(进入用户态，需要创建用户进程单独的页目录)
+    task->pde = (u32)copy_pde();
+    set_cr3(task->pde);
 
     u32 addr = (u32)task + PAGE_SIZE;
 
@@ -287,12 +298,11 @@ void task_to_user_mode(target_t target)
 
     iframe->error = PHINIX_MAGIC;
 
-    u32 stack3 = alloc_kpage(1); // todo 替换为用户栈
-
     iframe->eip = (u32)target;
     iframe->eflags = (0 << 12 | 0b10 | 1 << 9); // IOPL 为0 IF 为1
 
-    iframe->esp = stack3 + PAGE_SIZE;
+    // 用户栈顶
+    iframe->esp = USER_STACK_TOP;
 
     asm volatile(
         "movl %0, %%esp\n"

@@ -24,6 +24,7 @@ extern void interrupt_handler();
 handler_t handler_table[IDT_SIZE];
 extern handler_t handler_entry_table[ENTRY_SIZE];
 extern void syscall_handler();
+extern void page_fault();
 
 static char *messages[] = {
     "#DE Divide Error\0",
@@ -216,6 +217,9 @@ void idt_init()
     {
         handler_table[i] = exception_handler;
     }
+    
+    // 初始化缺页异常处理程序
+    handler_table[0xe] = page_fault;
 
     for (size_t i = 0x20; i < ENTRY_SIZE; i++)
     {

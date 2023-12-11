@@ -82,13 +82,13 @@ void memory_init(u32 magic, u32 addr)
             // 下一个tag对齐到8字节
             tag = (multi_tag_t *)((u32)tag + ((tag->size + 7) & ~7));
         }
-        
+
         multi_tag_mmap_t *mtag = (multi_tag_mmap_t *)tag;
         multi_mmap_entry_t *entry = mtag->entries;
         while ((u32)entry < (u32)tag + tag->size)
         {
             LOGK("Memory base 0x%p size 0x%p type %d\n",
-                (u32)entry->addr, (u32)entry->len, (u32)entry->type);
+                 (u32)entry->addr, (u32)entry->len, (u32)entry->type);
             count++;
             if (entry->type = ZONE_VALID && entry->len > memory_size)
             {
@@ -195,6 +195,13 @@ static void put_page(u32 addr)
     assert(free_pages > 0 && free_pages < total_pages);
 
     LOGK("Put page 0x%p\n", addr);
+}
+
+// 得到cr3寄存器
+u32 get_cr2()
+{
+    // 直接将mov eax, cr2，返回值在eax中
+    asm volatile("movl %cr2, %eax\n");
 }
 
 // 得到cr3寄存器
@@ -319,7 +326,7 @@ static u32 scan_page(bitmap_t *map, u32 count)
     {
         panic("Scan page fail!!!");
     }
-    
+
     u32 addr = PAGE(index);
     LOGK("Scan page 0x%p count %d\n", addr, count);
     return addr;
@@ -334,9 +341,8 @@ static void reset_page(bitmap_t *map, u32 addr, u32 count)
     for (size_t i = 0; i < count; i++)
     {
         assert(bitmap_test(map, index + i));
-        bitmap_set(map, index+i, false);
+        bitmap_set(map, index + i, false);
     }
-    
 }
 
 // 分配count个连续的内核页
@@ -447,7 +453,7 @@ void link_page(u32 vaddr)
     entry_init(entry, IDX(paddr));
     flush_tlb(vaddr);
 
-     LOGK("Link from 0x%p to 0x%p\n", vaddr, paddr);
+    LOGK("Link from 0x%p to 0x%p\n", vaddr, paddr);
 }
 
 // 去掉vaddr对应的物理内存映射
@@ -476,10 +482,72 @@ void unlink_page(u32 vaddr)
     u32 paddr = PAGE(entry->index);
     LOGK("Unlink from 0x%p to 0x%p\n", vaddr, paddr);
 
-    // 共享内存？
-    if (memory_map[entry->index] == 1)
-    {
-        put_page(paddr);
-    }
+    put_page(paddr);
+
     flush_tlb(vaddr);
+}
+
+// 拷贝pde
+page_entry_t *copy_pde()
+{
+    task_t *task = running_task();
+    page_entry_t *pde = (page_entry_t *)alloc_kpage(1); // todo free
+    memcpy(pde, (void *)task->pde, PAGE_SIZE);
+
+    // 将最后一个页目录指向自己
+    page_entry_t *entry = &pde[1023];
+    // 这里由于从内核分配，物理地址和线性地址相同所以使用pde的idx
+    entry_init(entry, IDX(pde));
+
+    return pde;
+}
+
+// 缺页错误编码（缺页中断会设置32位错误码）
+typedef struct page_error_code_t
+{
+    u8 present : 1;    // 由内存不存在导致
+    u8 write : 1;      // 由写操作导致
+    u8 user : 1;       // 用户或系统操作导致
+    u8 reserved0 : 1;  // 保留
+    u8 fetch : 1;      // 指令提取导致
+    u8 protection : 1; // 保护key导致
+    u8 shadow : 1;     // 隐藏stack访问
+    u16 reserved1 : 8;
+    u8 sgx : 1;
+    u16 reserved2;
+} _packed page_error_code_t;
+
+// 缺页中断处理
+void page_fault(
+    int vector,
+    u32 edi, u32 esi, u32 ebp, u32 esp,
+    u32 ebx, u32 edx, u32 ecx, u32 eax,
+    u32 gs, u32 fs, u32 es, u32 ds,
+    u32 vector0, u32 error, u32 eip, u32 cs, u32 eflags)
+{
+    assert(vector == 0xe);
+    // 导致缺页异常的地址从cr2寄存器中获取
+    u32 vaddr = get_cr2();
+
+    LOGK("fault address 0x%p...\n", vaddr);
+
+    // 转换错误码
+    page_error_code_t *code = (page_error_code_t *)&code;
+
+    // 获取当前执行的任务
+    task_t *task = running_task();
+
+    assert(KERNEL_MEMORY_SIZE <= vaddr < USER_STACK_TOP);
+
+    // 分配用户栈
+    if (!code->present && (vaddr > USER_STACK_BOTTOM))
+    {
+        // 获取页的开始地址
+        u32 page = PAGE(IDX(vaddr));
+        // 建立物理内存和虚拟地址的映射
+        link_page(page);
+        // BOCHS_MAGIC_BP;
+        return;
+    }
+    panic("page fault!!!");
 }
