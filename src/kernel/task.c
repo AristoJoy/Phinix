@@ -36,7 +36,7 @@ static task_t *get_free_task()
     {
         if (task_table[i] == NULL)
         {
-            task_t *task = (task_t *)alloc_kpage(1); // todo free_kpage
+            task_t *task = (task_t *)alloc_kpage(1);
             memset(task, 0, PAGE_SIZE);
             task->pid = i;
             task_table[i] = task;

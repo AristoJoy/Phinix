@@ -68,6 +68,13 @@ void clock_handler(int vector)
     
 }
 
+extern u32 startup_time;
+
+time_t sys_time()
+{
+    return startup_time + (jiffies * JIFFY) / 1000;
+}
+
 void pit_init()
 {
     // 配置计数器0 时钟

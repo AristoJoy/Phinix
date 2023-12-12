@@ -95,3 +95,9 @@ int32 write(fd_t fd, char *buf, u32 len)
 {
     return _syscall3(SYS_NR_WRITE, fd, (u32)buf, len);
 }
+
+// 获取从1970 1 1 00:00:00 开始的秒数
+time_t time()
+{
+    return _syscall0(SYS_NR_TIME);
+}
