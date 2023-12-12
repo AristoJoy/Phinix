@@ -112,7 +112,7 @@ time_t mktime(tm *time)
 {
     time_t res;
     int year; // 1970年开始的年数
-    if (time->year >- 70)
+    if (time->year >= 70)
     {
         year = time->year - 70;
     }
