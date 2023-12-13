@@ -59,8 +59,9 @@ static void user_init_thread()
 // 初始化线程
 void init_thread()
 {
-    // set_interrupt_state(true);
     char temp[100]; // 为了栈顶有充足的空间，用于存储栈中的局部变量，不和intr_iframe_t冲突
+    set_interrupt_state(true);
+    test();
     task_to_user_mode(user_init_thread);
 }
 

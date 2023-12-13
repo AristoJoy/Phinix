@@ -66,6 +66,23 @@
 
 ide_ctrl_t controllers[IDE_CTRL_NR];
 
+// ide 中断处理程序
+void ide_handler(int vector)
+{
+    send_eoi(vector); // 向中断控制器发送中断处理完成
+
+    // 得到中断向量对应的控制器
+    ide_ctrl_t *ctrl = &controllers[vector - IRQ_HARDDISK - 0x20];
+    // 读取常规状态寄存器（会破坏IRQ），表示中断处理结束
+    u8 state = in_byte(ctrl->iobase + IDE_STATUS);
+    LOGK("hard disk interrupt vector %d state 0x%x\n", vector, state);
+    if (ctrl->waiter)
+    {   
+        task_unblock(ctrl->waiter);
+        ctrl->waiter = NULL;
+    }
+}
+
 static u32 ide_error(ide_ctrl_t *ctrl)
 {
     u8 error = in_byte(ctrl->iobase + IDE_ERROR);
@@ -176,6 +193,7 @@ void ide_pio_write_sector(ide_disk_t *disk, u16 *buf)
 int ide_pio_read(ide_disk_t *disk, void *buf, u8 count, idx_t lba)
 {
     assert(count > 0);
+    assert(!get_interrupt_state()); // 不允许中断，否则会永久阻塞线程
 
     ide_ctrl_t *ctrl = disk->ctrl;
 
@@ -195,6 +213,14 @@ int ide_pio_read(ide_disk_t *disk, void *buf, u8 count, idx_t lba)
 
     for (size_t i = 0; i < count; i++)
     {
+        task_t *task = running_task();
+        if (task->state = TASK_RUNNING)
+        {
+            // 阻塞自己等待中断到来，等待磁盘准备数据
+            ctrl->waiter = task;
+            task_block(task, NULL, TASK_BLOCKED);
+        }
+        
         ide_busy_wait(ctrl, IDE_SR_DRQ);
         u32 offset = ((u32)buf + i * SECTOR_SIZE);
         ide_pio_read_sector(disk, (u16 *) offset);
@@ -210,6 +236,7 @@ int ide_pio_read(ide_disk_t *disk, void *buf, u8 count, idx_t lba)
 int ide_pio_write(ide_disk_t *disk, void *buf, u8 count, idx_t lba)
 {
     assert(count > 0);
+    assert(!get_interrupt_state()); // 不允许中断，否则会永久阻塞线程
 
     ide_ctrl_t *ctrl = disk->ctrl;
 
@@ -233,6 +260,14 @@ int ide_pio_write(ide_disk_t *disk, void *buf, u8 count, idx_t lba)
     {
         u32 offset = ((u32)buf + i * SECTOR_SIZE);
         ide_pio_write_sector(disk, (u16 *)offset);
+
+        task_t *task = running_task();
+        if (task->state = TASK_RUNNING)
+        {
+            // 阻塞自己等待中断到来，等待磁盘写数据
+            ctrl->waiter = task;
+            task_block(task, NULL, TASK_BLOCKED);
+        }
         ide_busy_wait(ctrl, IDE_SR_NULL);
     }
 
@@ -285,14 +320,11 @@ void ide_init()
     LOGK("ide init...\n");
     ide_ctrl_init();
 
-    void *buf = (void *)alloc_kpage(1);
-    BOCHS_MAGIC_BP;
-    LOGK("read buffer %x\n", buf);
-    ide_pio_read(&controllers[0].disks[0], buf, 1, 0);
-    BOCHS_MAGIC_BP;
-    memset(buf, 0x5a, SECTOR_SIZE);
-    BOCHS_MAGIC_BP;
-    ide_pio_write(&controllers[0].disks[0], buf, 1, 1);
+    // 注册硬盘中断处理函数，打开屏蔽字
+    set_interrupt_handler(IRQ_HARDDISK, ide_handler);
+    set_interrupt_handler(IRQ_HARDDISK2, ide_handler);
+    set_interrupt_mask(IRQ_HARDDISK, true);
+    set_interrupt_mask(IRQ_HARDDISK2, true);
+    set_interrupt_mask(IRQ_CASCADE, true);
 
-    free_kpage((u32)buf, 1);
 }
