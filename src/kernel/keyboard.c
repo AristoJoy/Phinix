@@ -5,6 +5,7 @@
 #include <phinix/mutex.h>
 #include <phinix/task.h>
 #include <phinix/fifo.h>
+#include <phinix/device.h>
 
 #define LOGK(fmt, args...) DEBUGK(fmt, ##args)
 
@@ -223,17 +224,17 @@ static char keymap[][4] = {
     /* 0x5F */ {INV, INV, false, false}, // PrintScreen
 };
 
-static lock_t lock; // 锁
+static lock_t lock;    // 锁
 static task_t *waiter; // 等待输入的任务
 
-#define BUFFER_SIZE 64 // 输入缓冲区大小
+#define BUFFER_SIZE 64        // 输入缓冲区大小
 static char buf[BUFFER_SIZE]; // 输入缓冲区
-static fifo_t fifo; // 循环队列
+static fifo_t fifo;           // 循环队列
 
 static bool capslock_state; // 大写锁定
-static bool scrlock_state; // 滚动锁定
-static bool numlock_state; // 数字锁定
-static bool extcode_state; // 扩展码状态
+static bool scrlock_state;  // 滚动锁定
+static bool numlock_state;  // 数字锁定
+static bool extcode_state;  // 扩展码状态
 
 // CTRL键状态
 #define ctrl_state (keymap[KEY_CTRL_L][2] || keymap[KEY_CTRL_L][3])
@@ -252,7 +253,6 @@ static void keyboard_wait()
     {
         state = in_byte(KEYBOARD_CTRL_PORT);
     } while (state & 0x02); // 读取键盘缓冲区，直到为空
-    
 }
 
 // 等待键盘ack
@@ -263,7 +263,6 @@ static void keyboard_ack()
     {
         state = in_byte(KEYBOARD_DATA_PORT);
     } while (state != KEYBOARD_CMD_ACK);
-    
 }
 
 // 设置led灯状态
@@ -287,7 +286,7 @@ void keyboard_handler(int vector)
     send_eoi(vector); // 发送中断处理完成信号
 
     u16 scancode = in_byte(KEYBOARD_DATA_PORT); // 从键盘读取按键信息扫描码
-    
+
     u8 ext = 2; // keymap 状态索引，默认没有shift键
 
     // 扩展码字节
@@ -303,14 +302,14 @@ void keyboard_handler(int vector)
     {
         // 修改状态索引
         ext = 3;
-        
+
         // 修改扫描码，添加0xe0前缀
         scancode |= 0xe000;
 
         // 扩展状态清楚
         extcode_state = false;
     }
-    
+
     // 获得通码（与断码就相差0x80）
     u16 makecode = (scancode & 0x7f);
     if (makecode == CODE_PRINT_SCREEN_DOWN)
@@ -323,7 +322,7 @@ void keyboard_handler(int vector)
     {
         return;
     }
-    
+
     // 判断是否是断码
     bool breakcode = ((scancode & 0x0080) != 0);
     // 如果这个键被抬起来
@@ -333,7 +332,7 @@ void keyboard_handler(int vector)
         keymap[makecode][ext] = false;
         return;
     }
-    
+
     // 下面是通码
     keymap[makecode][ext] = true;
 
@@ -359,7 +358,7 @@ void keyboard_handler(int vector)
     {
         set_leds();
     }
-    
+
     // 计算shift状态
     bool shift = false;
     // 大写锁定打开，shift状态取反（只对字幕有效）
@@ -371,7 +370,7 @@ void keyboard_handler(int vector)
     {
         shift = !shift;
     }
-    
+
     // 获取ASCII码
     char ch = 0;
 
@@ -384,12 +383,12 @@ void keyboard_handler(int vector)
     {
         ch = keymap[makecode][shift];
     }
-    
+
     if (ch == INV)
     {
         return;
     }
-    
+
     // LOGK("keydown %c \n", ch);
     fifo_put(&fifo, ch);
     if (waiter != NULL)
@@ -397,10 +396,9 @@ void keyboard_handler(int vector)
         task_unblock(waiter);
         waiter = NULL;
     }
-
 }
 
-u32 keyboard_read(char *buf, u32 count)
+u32 keyboard_read(void *dev, char *buf, u32 count)
 {
     lock_acquire(&lock);
     int nr = 0;
@@ -424,7 +422,7 @@ void keyboard_init()
     numlock_state = false;
     extcode_state = false;
 
-    fifo_init(&fifo, buf,BUFFER_SIZE);
+    fifo_init(&fifo, buf, BUFFER_SIZE);
     lock_init(&lock);
     waiter = NULL;
 
@@ -432,4 +430,6 @@ void keyboard_init()
 
     set_interrupt_handler(IRQ_KEYBOARD, keyboard_handler);
     set_interrupt_mask(IRQ_KEYBOARD, true);
+
+    device_install(DEV_CHAR, DEV_KEYBOARD, NULL, "keyboard", 0, NULL, keyboard_read, NULL);
 }

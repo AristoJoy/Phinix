@@ -73,7 +73,8 @@ void test_thread()
         // printf("test thread %d %d %d...\n", getpid(), getppid(), counter++);
 
         // BOCHS_MAGIC_BP;
-        sleep(2000);
+        test();
+        // sleep(2000);
 
     }
 }
