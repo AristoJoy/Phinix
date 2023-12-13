@@ -81,6 +81,7 @@ $(BUILD)/master.img: $(BUILD)/boot/boot.bin \
 	$(BUILD)/boot/loader.bin \
 	$(BUILD)/system.bin \
 	$(BUILD)/system.map \
+	$(SRC)/utils/master.sfdisk \
 
 # 创建一个16M的硬盘镜像
 	yes | bximage -q -hd=16 -func=create -sectsize=512 -imgmode=flat $@
@@ -92,6 +93,8 @@ $(BUILD)/master.img: $(BUILD)/boot/boot.bin \
 	test -n "$$(find $(BUILD)/system.bin -size -100k)"
 # 将system.bin写入硬盘
 	dd if=$(BUILD)/system.bin of=$@ bs=512 count=200 seek=10 conv=notrunc
+# 对硬盘进行分区
+	sfdisk $@ < $(SRC)/utils/master.sfdisk
 
 $(BUILD)/slave.img:
 # 创建一个 32M 的硬盘镜像

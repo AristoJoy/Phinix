@@ -1,5 +1,5 @@
-#ifndef PHINIX_PRINTK_H
-#define PHINIX_PRINTK_H
+#ifndef PHINIX_STDIO_H
+#define PHINIX_STDIO_H
 
 #include <phinix/stdarg.h>
 

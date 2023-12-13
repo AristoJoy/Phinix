@@ -64,6 +64,16 @@
 #define IDE_LBA_MASTER 0b11100000 // LBA 主盘
 #define IDE_LBA_SLAVE 0b11110000  // LBA 从盘
 
+// 分区文件系统
+// 参考 https://www.win.tue.nl/~aeb/partitions/partition_types-1.html
+typedef enum PART_FS
+{
+    PART_FS_FAT12 = 1,    // FAT12
+    PART_FS_EXTENDED = 5, // 扩展分区
+    PART_FS_MINIX = 0x80, // minux
+    PART_FS_LINUX = 0x83, // linux
+} PART_FS;
+
 typedef struct ide_params_t
 {
     u16 config;                 // 0 General configuration bits
@@ -260,7 +270,7 @@ int ide_pio_read(ide_disk_t *disk, void *buf, u8 count, idx_t lba)
     for (size_t i = 0; i < count; i++)
     {
         task_t *task = running_task();
-        if (task->state = TASK_RUNNING)
+        if (task->state == TASK_RUNNING)
         {
             // 阻塞自己等待中断到来，等待磁盘准备数据
             ctrl->waiter = task;
@@ -321,6 +331,18 @@ int ide_pio_write(ide_disk_t *disk, void *buf, u8 count, idx_t lba)
     return 0;
 }
 
+// 读分区
+int ide_pio_part_read(ide_part_t *part, void *buf, u8 count, idx_t lba)
+{
+    return ide_pio_read(part->disk, buf, count, part->start + lba);
+}
+
+// 写分区
+int ide_pio_part_write(ide_part_t *part, void *buf, u8 count, idx_t lba)
+{
+    return ide_pio_write(part->disk, buf, count, part->start + lba);
+}
+
 static void ide_swap_pairs(char *buf, u32 len)
 {
     for (size_t i = 0; i < len; i += 2)
@@ -330,6 +352,70 @@ static void ide_swap_pairs(char *buf, u32 len)
         buf[i + 1] = ch;
     }
     buf[len - 1] = '\0';
+}
+
+// 识别磁盘
+static void ide_part_init(ide_disk_t *disk, u16 *buf)
+{
+    // 磁盘不可用
+    if (!disk->total_lba)
+    {
+        return;
+    }
+    
+    // 读取注意到扇区
+    ide_pio_read(disk, buf, 1, 0);
+
+    // 初始化主引导扇区
+    boot_sector_t *boot = (boot_sector_t *)buf;
+
+    for (size_t i = 0; i < IDE_PART_NR; i++)
+    {
+        part_entry_t *entry = &boot->entry[i];
+        ide_part_t *part = &disk->parts[i];
+        if (!entry->count)
+        {
+            continue;
+        }
+        
+        sprintf(part->name, "%s%d", disk->name, i + 1);
+
+        LOGK("part %s \n", part->name);
+        LOGK("    bootable %d\n", entry->bootable);
+        LOGK("    start %d\n", entry->start);
+        LOGK("    count %d\n", entry->count);
+        LOGK("    system %d\n", entry->system);
+
+        part->disk = disk;
+        part->count = entry->count;
+        part->system = entry->system;
+        part->start = entry->start;
+
+        if (entry->system == PART_FS_EXTENDED)
+        {
+            LOGK("Unsupported extended partition!!!\n");
+
+            boot_sector_t *eboot = (boot_sector_t *)(buf + SECTOR_SIZE);
+            ide_pio_read(disk, (void *)eboot, 1, entry->start);
+
+            for (size_t j = 0; j < IDE_PART_NR; j++)
+            {
+                part_entry_t *eentry = &eboot->entry[j];
+                if (!eentry->count)
+                {
+                    continue;
+                }
+
+                LOGK("part %d  extend %d\n", i, j);
+                LOGK("    bootable %d\n", eentry->bootable);
+                LOGK("    start %d\n", eentry->start);
+                LOGK("    count %d\n", eentry->count);
+                LOGK("    system %d\n", eentry->system);
+            }
+            
+        }
+        
+    }
 }
 
 // 识别磁盘
@@ -417,6 +503,7 @@ static void ide_ctrl_init()
                 disk->selector = IDE_LBA_MASTER;
             }
             ide_identify(disk, buf);
+            ide_part_init(disk, buf);
         }
     }
     free_kpage((u32)buf, 1);
