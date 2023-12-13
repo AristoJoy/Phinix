@@ -29,23 +29,8 @@ static void syscall_default()
 
 task_t *task = NULL;
 
-#include <phinix/string.h>
-#include <phinix/ide.h>
-
-extern ide_ctrl_t controllers[2];
-
 static u32 sys_test()
 {
-    u16 *buf = (u16 *)alloc_kpage(1);
-    BOCHS_MAGIC_BP;
-    LOGK("read buffer %x\n", buf);
-    ide_pio_read(&controllers[0].disks[0], buf, 4, 0);
-    BOCHS_MAGIC_BP;
-    memset(buf, 0x5a, SECTOR_SIZE);
-    BOCHS_MAGIC_BP;
-    ide_pio_write(&controllers[0].disks[0], buf, 1, 1);
-
-    free_kpage((u32)buf, 1);
     return 255;
 }
 
