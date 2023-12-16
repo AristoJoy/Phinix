@@ -33,18 +33,30 @@ task_t *task = NULL;
 
 static u32 sys_test()
 {
-    char ch;
+    // char ch;
     device_t *device;
 
-    device = device_find(DEV_KEYBOARD, 0);
+    // device = device_find(DEV_KEYBOARD, 0);
+    // assert(device);
+
+    // device_read(device->dev, &ch, 1, 0, 0);
+
+    // device = device_find(DEV_CONSOLE, 0);
+    // assert(device);
+
+    // device_write(device->dev, &ch, 1, 0, 0);
+
+    void *buf = (void *)alloc_kpage(1);
+
+    device = device_find(DEV_IDE_PART, 0);
+
     assert(device);
 
-    device_read(device->dev, &ch, 1, 0, 0);
+    memset(buf, running_task()->pid, 512);
 
-    device = device_find(DEV_CONSOLE, 0);
-    assert(device);
+    device_request(device->dev, buf, 1, running_task()->pid, 0, REQ_WRITE);
 
-    device_write(device->dev, &ch, 1, 0, 0);
+    free_kpage((u32)buf, 1);
     
     return 255;
 }

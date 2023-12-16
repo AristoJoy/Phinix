@@ -20,7 +20,6 @@ static device_t *get_null_device()
         {
             return device;
         }
-        
     }
     panic("no more devices!!!");
 }
@@ -56,9 +55,8 @@ device_t *device_find(int subtype, idx_t idx)
             return device;
         }
         nr++;
-        
     }
-    
+
     return NULL;
 }
 
@@ -71,6 +69,70 @@ device_t *device_get(dev_t dev)
     return device;
 }
 
+// 执行块设备请求
+void do_request(request_t *req)
+{
+    switch (req->type)
+    {
+    case REQ_READ:
+        device_read(req->dev, req->buf, req->count, req->idx, req->flags);
+        break;
+    case REQ_WRITE:
+        device_write(req->dev, req->buf, req->count, req->idx, req->flags);
+        break;
+    default:
+        panic("req type %d unknown!!!", req->type);
+        break;
+    }
+}
+
+// 块设备请求
+void device_request(dev_t dev, void *buf, u8 count, idx_t idx, int flags, u32 type)
+{
+    device_t *device = device_get(dev);
+    assert(device->type == DEV_BLOCK); // 是块设备
+    idx_t offset = idx + device_ioctl(device->dev, DEV_CMD_SECTOR_START, 0, 0);
+    if (device->parent)
+    {
+        device = device_get(device->parent);
+    }
+
+    request_t *req = kmalloc(sizeof(request_t));
+
+    req->dev = dev;
+    req->buf = buf;
+    req->count = count;
+    req->idx = offset;
+    req->flags = flags;
+    req->type = type;
+    req->task = NULL;
+
+    // 判断列表是否为空
+    bool empty = list_empty(&device->request_list);
+
+    list_push(&device->request_list, &req->node);
+
+    // 如果链表不为空
+    if (!empty)
+    {
+        req->task = running_task();
+        task_block(req->task, NULL, TASK_BLOCKED);
+    }
+
+    do_request(req);
+
+    list_remove(&req->node);
+
+    kfree(req);
+
+    if (!list_empty(&device->request_list))
+    {
+        // 先来先服务
+        request_t *next_req = element_entry(request_t, node, device->request_list.tail.prev);
+        assert(next_req->task->magic == PHINIX_MAGIC);
+        task_unblock(next_req->task);
+    }
+}
 // 设备控制
 int device_ioctl(dev_t dev, int cmd, void *args, int flags)
 {
@@ -110,7 +172,7 @@ void device_init()
 {
     for (size_t i = 0; i < DEVICE_NR; i++)
     {
-        device_t *device =&devices[i];
+        device_t *device = &devices[i];
         strcpy((char *)device->name, "null");
         device->type = DEV_NULL;
         device->subtype = DEV_NULL;
@@ -119,6 +181,6 @@ void device_init()
         device->ioctl = NULL;
         device->read = NULL;
         device->write = NULL;
+        list_init(&device->request_list);
     }
-    
 }

@@ -8,6 +8,7 @@
 #include <phinix/string.h>
 #include <phinix/assert.h>
 #include <phinix/debug.h>
+#include <phinix/device.h>
 
 #define LOGK(fmt, args...) DEBUGK(fmt, ##args)
 
@@ -245,6 +246,22 @@ void ide_pio_write_sector(ide_disk_t *disk, u16 *buf)
     }
 }
 
+// ide磁盘设备控制
+int ide_pio_ioctl(ide_disk_t *disk, int cmd, void *args, int flags)
+{
+    switch (cmd)
+    {
+    case DEV_CMD_SECTOR_START:
+        return 0;
+    case DEV_CMD_SECTOR_COUNT:
+        return disk->total_lba;
+
+    default:
+        panic("device recommand %d can't recognize!!!", cmd);
+        break;
+    }
+}
+
 // pio 读磁盘
 int ide_pio_read(ide_disk_t *disk, void *buf, u8 count, idx_t lba)
 {
@@ -323,12 +340,30 @@ int ide_pio_write(ide_disk_t *disk, void *buf, u8 count, idx_t lba)
             ctrl->waiter = task;
             task_block(task, NULL, TASK_BLOCKED);
         }
+        LOGK("write sector wait 1s, pid %d\n", task->pid);
+        task_sleep(100); // todo remove after test
         ide_busy_wait(ctrl, IDE_SR_NULL);
     }
 
     lock_release(&ctrl->lock);
 
     return 0;
+}
+
+// ide磁盘分区设备控制
+int ide_pio_part_ioctl(ide_part_t *part, int cmd, void *args, int flags)
+{
+    switch (cmd)
+    {
+    case DEV_CMD_SECTOR_START:
+        return part->start;
+    case DEV_CMD_SECTOR_COUNT:
+        return part->count;
+
+    default:
+        panic("device recommand %d can't recognize!!!", cmd);
+        break;
+    }
 }
 
 // 读分区
@@ -362,7 +397,7 @@ static void ide_part_init(ide_disk_t *disk, u16 *buf)
     {
         return;
     }
-    
+
     // 读取注意到扇区
     ide_pio_read(disk, buf, 1, 0);
 
@@ -377,7 +412,7 @@ static void ide_part_init(ide_disk_t *disk, u16 *buf)
         {
             continue;
         }
-        
+
         sprintf(part->name, "%s%d", disk->name, i + 1);
 
         LOGK("part %s \n", part->name);
@@ -412,9 +447,7 @@ static void ide_part_init(ide_disk_t *disk, u16 *buf)
                 LOGK("    count %d\n", eentry->count);
                 LOGK("    system %d\n", eentry->system);
             }
-            
         }
-        
     }
 }
 
@@ -509,11 +542,40 @@ static void ide_ctrl_init()
     free_kpage((u32)buf, 1);
 }
 
+// 注册磁盘设备
+static void ide_install()
+{
+    for (size_t cidx = 0; cidx < IDE_CTRL_NR; cidx++)
+    {
+        ide_ctrl_t *ctrl = &controllers[cidx];
+        for (size_t didx = 0; didx < IDE_DISK_NR; didx++)
+        {
+            ide_disk_t *disk = &ctrl->disks[didx];
+            if (!disk->total_lba)
+            {
+                continue;
+            }
+            dev_t dev = device_install(DEV_BLOCK, DEV_IDE_DISK, disk, disk->name, 0, ide_pio_ioctl, ide_pio_read, ide_pio_write);
+            for (size_t i = 0; i < IDE_PART_NR; i++)
+            {
+                ide_part_t *part = &disk->parts[i];
+                if (!part->count)
+                {
+                    continue;
+                }
+                device_install(DEV_BLOCK, DEV_IDE_PART, part, part->name, dev, ide_pio_part_ioctl, ide_pio_part_read, ide_pio_part_write);
+            }
+        }
+    }
+}
+
 // 控制器初始化
 void ide_init()
 {
     LOGK("ide init...\n");
     ide_ctrl_init();
+
+    ide_install(); // 安装设备
 
     // 注册硬盘中断处理函数，打开屏蔽字
     set_interrupt_handler(IRQ_HARDDISK, ide_handler);

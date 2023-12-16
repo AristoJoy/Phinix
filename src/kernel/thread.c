@@ -66,15 +66,16 @@ void init_thread()
 void test_thread()
 {
     set_interrupt_state(true);
-    u32 counter = 0;
-
+    // u32 counter = 0;
+    test();
+    LOGK("test finished of task %d\n", getpid());
     while (true)
     {
         // printf("test thread %d %d %d...\n", getpid(), getppid(), counter++);
 
         // BOCHS_MAGIC_BP;
-        test();
-        // sleep(2000);
+        // test();
+        sleep(10);
 
     }
 }
