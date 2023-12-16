@@ -9,6 +9,8 @@
 
 #define DEVICE_NR 64 // 设备数量
 
+#define DEV_REQ_IDX_OFFSET element_node_offset(request_t, node, idx)
+
 static device_t devices[DEVICE_NR]; // 设备数组
 
 static device_t *get_null_device()
@@ -72,6 +74,8 @@ device_t *device_get(dev_t dev)
 // 执行块设备请求
 void do_request(request_t *req)
 {
+    LOGK("dev %d do request idx %d\n", req->dev, req->idx);
+
     switch (req->type)
     {
     case REQ_READ:
@@ -84,6 +88,38 @@ void do_request(request_t *req)
         panic("req type %d unknown!!!", req->type);
         break;
     }
+}
+
+// 获取下一个请求
+static request_t *reguest_nextreq(device_t *device, request_t *req)
+{
+    list_t *list = &device->request_list;
+
+    if (device->direct == DIRECT_UP && req->node.next == &list->tail)
+    {
+        device->direct = DIRECT_DOWN;
+    }
+    else if (device->direct == DIRECT_DOWN && req->node.prev == &list->head)
+    {
+        device->direct = DIRECT_UP;
+    }
+
+    void *next = NULL;
+    if (device->direct == DIRECT_UP)
+    {
+        next = req->node.next;
+    }
+    else
+    {
+        next = req->node.prev;
+    }
+
+    if (next == &list->head || next == &list->tail)
+    {
+        return NULL;
+    }
+    
+    return element_entry(request_t, node, next);
 }
 
 // 块设备请求
@@ -107,10 +143,13 @@ void device_request(dev_t dev, void *buf, u8 count, idx_t idx, int flags, u32 ty
     req->type = type;
     req->task = NULL;
 
+    LOGK("dev %d request idx %d\n", req->dev, req->idx);
+
     // 判断列表是否为空
     bool empty = list_empty(&device->request_list);
 
-    list_push(&device->request_list, &req->node);
+    // list_push(&device->request_list, &req->node);
+    list_insert_sort(&device->request_list, &req->node, DEV_REQ_IDX_OFFSET);
 
     // 如果链表不为空
     if (!empty)
@@ -121,14 +160,14 @@ void device_request(dev_t dev, void *buf, u8 count, idx_t idx, int flags, u32 ty
 
     do_request(req);
 
+    request_t *next_req = reguest_nextreq(device, req);
+
     list_remove(&req->node);
 
     kfree(req);
 
-    if (!list_empty(&device->request_list))
+    if (next_req)
     {
-        // 先来先服务
-        request_t *next_req = element_entry(request_t, node, device->request_list.tail.prev);
         assert(next_req->task->magic == PHINIX_MAGIC);
         task_unblock(next_req->task);
     }
@@ -182,5 +221,6 @@ void device_init()
         device->read = NULL;
         device->write = NULL;
         list_init(&device->request_list);
+        device->direct = DIRECT_UP;
     }
 }
