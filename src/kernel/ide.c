@@ -334,13 +334,12 @@ int ide_pio_write(ide_disk_t *disk, void *buf, u8 count, idx_t lba)
         ide_pio_write_sector(disk, (u16 *)offset);
 
         task_t *task = running_task();
-        if (task->state = TASK_RUNNING)
+        if (task->state == TASK_RUNNING)
         {
             // 阻塞自己等待中断到来，等待磁盘写数据
             ctrl->waiter = task;
             task_block(task, NULL, TASK_BLOCKED);
         }
-        LOGK("write sector wait 1s, pid %d\n", task->pid);
         ide_busy_wait(ctrl, IDE_SR_NULL);
     }
 

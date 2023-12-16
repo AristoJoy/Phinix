@@ -16,8 +16,8 @@ extern void task_init();
 extern void syscall_init();
 extern void tss_init();
 extern void buffer_init();
+extern void super_init();
 extern void hang();
-
 
 void kernel_init()
 {
@@ -37,7 +37,8 @@ void kernel_init()
     task_init();
     syscall_init();
 
+    super_init();
+
     // list_test();
     set_interrupt_state(true);
-
 }
