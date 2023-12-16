@@ -61,6 +61,7 @@ $(BUILD)/kernel.bin: \
 	$(BUILD)/kernel/keyboard.o \
 	$(BUILD)/kernel/buffer.o \
 	$(BUILD)/fs/super.o \
+	$(BUILD)/fs/bmap.o \
 	$(BUILD)/lib/bitmap.o \
 	$(BUILD)/lib/string.o  \
 	$(BUILD)/lib/vsprintf.o  \
