@@ -6,8 +6,20 @@
 #define PAGE_SIZE 0x1000     // 页大小 4k
 #define MEMORY_BASE 0x100000 // 1M 可用内存开始的位置
 
-// 内核占用的内存大小8M
-#define KERNEL_MEMORY_SIZE 0x800000
+// 内核占用的内存大小16M
+#define KERNEL_MEMORY_SIZE 0x1000000
+
+// 内核缓存地址
+#define KERNEL_BUFFER_MEM 0x800000
+
+// 内核缓存大小
+#define KERNEL_BUFFER_SIZE 0x400000
+
+// 内核虚拟磁盘地址
+#define KERNEL_RAMDISK_MEM (KERNEL_BUFFER_MEM + KERNEL_BUFFER_SIZE)
+
+// 内存虚拟磁盘大小
+#define KERNEL_RAMDISK_SIZE 0x400000
 
 // 用户栈地址128M
 #define USER_STACK_TOP 0x8000000

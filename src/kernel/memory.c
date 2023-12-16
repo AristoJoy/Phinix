@@ -26,9 +26,11 @@
 static u32 KERNEL_PAGE_TABLE[] = {
     0x2000,
     0x3000,
+    0x4000,
+    0x5000,
 };
 
-#define KERNEL_MAP_BITS 0x4000
+#define KERNEL_MAP_BITS 0x6000
 
 bitmap_t kernel_map;
 
@@ -517,8 +519,8 @@ page_entry_t *copy_pde()
 
     page_entry_t *dentry;
 
-    // 0 和1 是内核态的8M内存，下面拷贝的是用户态的页目录
-    for (size_t didx = 2; didx < 1023; didx++)
+    // 前面是内核态内存，下面拷贝的是用户态的页目录
+    for (size_t didx = (sizeof(KERNEL_PAGE_TABLE) / 4); didx < 1023; didx++)
     {
         dentry = &pde[didx];
         if (!dentry->present)
@@ -563,7 +565,7 @@ void free_pde()
 
     page_entry_t *pde = get_pde();
 
-    for (size_t didx = 2; didx < 1023; didx++)
+    for (size_t didx = (sizeof(KERNEL_PAGE_TABLE) / 4); didx < 1023; didx++)
     {
         page_entry_t *dentry = &pde[didx];
         if (!dentry->present)
@@ -619,7 +621,7 @@ int32 sys_brk(void *addr)
 
     assert(task->uid != KERNEL_USER);
 
-    assert(KERNEL_MEMORY_SIZE < brk < USER_STACK_BOTTOM);
+    assert(KERNEL_MEMORY_SIZE <= brk && brk < USER_STACK_BOTTOM);
 
     u32 old_brk = task->brk;
 
@@ -661,7 +663,7 @@ void page_fault(
     // 获取当前执行的任务
     task_t *task = running_task();
 
-    assert(KERNEL_MEMORY_SIZE <= vaddr < USER_STACK_TOP);
+    assert(KERNEL_MEMORY_SIZE <= vaddr && vaddr < USER_STACK_TOP);
 
     // 用户只读内存(写时复制)
     if (code->present)
