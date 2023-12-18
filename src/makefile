@@ -62,6 +62,7 @@ $(BUILD)/kernel.bin: \
 	$(BUILD)/kernel/buffer.o \
 	$(BUILD)/fs/super.o \
 	$(BUILD)/fs/bmap.o \
+	$(BUILD)/fs/inode.o \
 	$(BUILD)/lib/bitmap.o \
 	$(BUILD)/lib/string.o  \
 	$(BUILD)/lib/vsprintf.o  \

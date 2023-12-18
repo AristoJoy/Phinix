@@ -255,6 +255,9 @@ static task_t *task_create(target_t target, const char *name, u32 priority, u32 
     task->vmap = &kernel_map;
     task->pde = KERNEL_PAGE_DIR;
     task->brk = KERNEL_MEMORY_SIZE;
+    task->iroot = get_root_inode();
+    task->ipwd = get_root_inode();
+
     task->magic = PHINIX_MAGIC;
 
     return task;

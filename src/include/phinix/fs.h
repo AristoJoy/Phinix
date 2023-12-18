@@ -14,7 +14,15 @@
 #define IMAP_NR 8 // inode 位图块，最大值
 #define ZMAP_NR 8 // 块位图块，最大值
 
-#define BLOCK_BITS (BLOCK_SIZE * 8) // 块位图大小
+#define BLOCK_BITS (BLOCK_SIZE * 8)                      // 块位图大小
+#define BLOCK_INODES (BLOCK_SIZE / sizeof(inode_desc_t)) // 一个块可以存放的inode数量
+#define BLOCK_DENTRIES (BLOCK_SIZE / sizeof(dentry_t))   // 一个块可以存放的目录项数量
+#define BLOCK_INDEXES (BLOCK_SIZE / sizeof(u16))         // 块索引数量
+
+#define DIRECT_BLOCK (7)                                               // 直接块数量
+#define INDIRECT1_BLOCK BLOCK_INDEXES                                  // 一级间接块数量
+#define INDIRECT2_BLOCK (INDIRECT1_BLOCK * INDIRECT1_BLOCK)            // 二级间接块数量
+#define TOTAL_BLOCK (DIRECT_BLOCK + INDIRECT1_BLOCK + INDIRECT2_BLOCK) // 全部块数量
 
 // inode描述符
 typedef struct inode_desc_t
@@ -82,5 +90,16 @@ idx_t balloc(dev_t dev);          // 分配一个文件块
 void bfree(dev_t dev, idx_t idx); // 释放一个文件块
 idx_t ialloc(dev_t dev);          // 分配一个文件系统 inode
 void ifree(dev_t dev, idx_t idx); // 释放一个文件系统 inode
+
+// 获取inode第block块的索引值
+// 如果不存在且create为true，则创建
+idx_t bmap(inode_t *inode, idx_t block, bool create);
+
+// 获取根目录inode
+inode_t *get_root_inode();
+// 获取设备dev的nr inode
+inode_t *iget(dev_t dev, idx_t nr);
+// 释放inode
+void iput(inode_t *inode);
 
 #endif
