@@ -4,13 +4,14 @@
 #include <phinix/types.h>
 
 // 文件类型
-#define IFMT 00170000 // 文件类型（8进制表示）
-#define IFREG 0100000 // 常规文件
-#define IFBLK 0060000 // 块特殊（设备）文件，如磁盘dev/fd0
-#define IFDIR 0040000 // 目录文件
-#define IFCHR 0020000 // 字符设备文件
-#define IFIFO 0010000 // FIFO特殊文件
-#define IFSYM 0120000 // 符号链接
+#define IFMT 00170000  // 文件类型（8进制表示）
+#define IFREG 0100000  // 常规文件
+#define IFBLK 0060000  // 块特殊（设备）文件，如磁盘dev/fd0
+#define IFDIR 0040000  // 目录文件
+#define IFCHR 0020000  // 字符设备文件
+#define IFIFO 0010000  // FIFO特殊文件
+#define IFLNK 0120000  // 符号链接
+#define IFSOCK 0140000 // 套接字
 
 // 文件属性位：
 // ISUID 用于测试文件的set-user-ID 标志是否置位
@@ -27,7 +28,9 @@
 #define ISCHR(m) (((m) & IFMT) == IFCHR)  // 是字符设备文件
 #define ISBLK(m) (((m) & IFMT) == IFBLK)  // 是块设备文件
 #define ISFIFO(m) (((m) & IFMT) == IFIFO) // 是 FIFO 特殊文件
-#define ISSYM(m) (((m) & IFMT) == IFSYM)  // 是符号连接文件
+#define ISLNK(m) (((m) & IFMT) == IFLNK)  // 是符号连接文件
+#define ISSOCK(m) (((m) & IFMT) == IFSOCK) // 是套接字文件
+#define ISFILE(m) ISREG(m)  // 更直接的红
 
 // 文件访问权限
 #define IRWXU 00700 // 宿主可以读、写、执行/搜索
@@ -48,14 +51,14 @@
 // 文件系统状态
 typedef struct stat_t
 {
-    dev_t dev; // 含有文件的设备号
-    idx_t nr;  // 文件i节点号
-    u16 mode; // 文件类型和属性
-    u8 nlinks; // 指定文件的链接数
-    u16 uid; // 文件的用户（标识）号
-    u8 gid; // 文件的组号
-    dev_t rdev; // 设备号（如果文件时特殊的字符文件或块文件）
-    size_t size; /// 文件大小（字节数）（如果文件是常规文件）
+    dev_t dev;    // 含有文件的设备号
+    idx_t nr;     // 文件i节点号
+    u16 mode;     // 文件类型和属性
+    u8 nlinks;    // 指定文件的链接数
+    u16 uid;      // 文件的用户（标识）号
+    u8 gid;       // 文件的组号
+    dev_t rdev;   // 设备号（如果文件时特殊的字符文件或块文件）
+    size_t size;  /// 文件大小（字节数）（如果文件是常规文件）
     time_t atime; // 上次（最后）访问时间
     time_t mtime; // 最后修改时间
     time_t ctime; // 最后节点修改时间

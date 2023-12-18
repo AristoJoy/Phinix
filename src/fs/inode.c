@@ -6,6 +6,7 @@
 #include <phinix/arena.h>
 #include <phinix/string.h>
 #include <phinix/stdlib.h>
+#include <phinix/stat.h>
 
 #define LOGK(fmt, args...) DEBUGK(fmt, ##args)
 
@@ -23,7 +24,6 @@ static inode_t *get_free_inode()
         {
             return inode;
         }
-        
     }
     panic("no more inode!!!");
 }
@@ -56,14 +56,13 @@ static inode_t *find_inode(dev_t dev, idx_t nr)
     assert(sb);
     list_t *list = &sb->inode_list;
 
-    for(list_node_t *node = list->head.next; node != &list->tail; node = node->next)
+    for (list_node_t *node = list->head.next; node != &list->tail; node = node->next)
     {
         inode_t *inode = element_entry(inode_t, node, node);
         if (inode->nr == nr)
         {
             return inode;
         }
-        
     }
     return NULL;
 }
@@ -78,7 +77,7 @@ inode_t *iget(dev_t dev, idx_t nr)
         inode->atime = time();
         return inode;
     }
-    
+
     super_block_t *sb = get_super(dev);
     assert(sb);
 
@@ -119,15 +118,14 @@ void iput(inode_t *inode)
     {
         bwrite(inode->buf);
     }
-    
-    
+
     inode->count--;
 
     if (inode->count)
     {
         return;
     }
-    
+
     // 释放inode对应的缓冲
     brelse(inode->buf);
 
@@ -138,6 +136,123 @@ void iput(inode_t *inode)
     put_free_inode(inode);
 }
 
+// 从 inode 的 offset 处，读 len 个字节到 buf
+int inode_read(inode_t *inode, char *buf, u32 len, off_t offset)
+{
+    assert(ISFILE(inode->desc->mode) || ISDIR(inode->desc->mode));
+
+    // 如果偏移量超过文件大小，返回EOF
+    if (offset >= inode->desc->size)
+    {
+        return EOF;
+    }
+    // 开始读取的位置
+    u32 begin = offset;
+
+    // 剩余字节数
+    u32 left = MIN(len, inode->desc->size - offset);
+    while (left)
+    {
+        // 找到对应的文件偏移，所在文件块
+        idx_t nr = bmap(inode, offset / BLOCK_SIZE, false);
+        assert(nr);
+
+        // 读取文件块缓冲
+        buffer_t *bf = bread(inode->dev, nr);
+
+        // 文件块中的偏移量
+        u32 start = offset % BLOCK_SIZE;
+
+        // 本次需要读取的字节数
+        u32 chars = MIN(BLOCK_SIZE - start, left);
+
+        // 更新偏移量和剩余字节数
+        offset += chars;
+        left -= chars;
+
+        // 文件块中的指针
+        char *ptr = bf->data + start;
+
+        // 拷贝内容
+        memcpy(buf, ptr, chars);
+
+        // 更新缓存位置
+        buf += chars;
+
+        // 释放文件块缓冲
+        brelse(bf);
+    }
+
+    // 更新访问时间
+    inode->atime = time();
+
+    // 返回读取的数量
+    return offset - begin;
+}
+
+// 从 inode 的 offset 处，将 buf 的 len 个字节写入磁盘
+int inode_write(inode_t *inode, char *buf, u32 len, off_t offset)
+{
+    assert(ISFILE(inode->desc->mode));
+
+    // 开始的位置
+    u32 begin = offset;
+
+    // 剩余数量
+    u32 left = len;
+
+    while (left)
+    {
+        // 找到文件块，如果不存在则创建
+        idx_t nr = bmap(inode, offset / BLOCK_SIZE, true);
+        assert(nr);
+
+        // 读取文件块
+        buffer_t *bf = bread(inode->dev, nr);
+        bf->dirty = true;
+
+        // 块中的偏移
+        u32 start = offset % BLOCK_SIZE;
+        // 文件块中的指针
+        char *ptr = bf->data + start;
+
+        // 读取的数量
+        u32 chars = MIN(BLOCK_SIZE - start, left);
+
+        // 更新偏移量
+        offset += chars;
+
+        // 更新剩余字节数
+        left-= chars;
+
+        // 如果偏移量大于文件大小，这更新
+        if (offset > inode->desc->size)
+        {
+            inode->desc->size = offset;
+            inode->buf->dirty = true;
+        }
+        
+        // 拷贝内容
+        memcpy(ptr, buf, chars);
+
+        // 更新缓存偏移
+        buf += chars;
+
+        // 释放文件块
+        brelse(bf);
+    }
+    
+    // 更新修改时间
+    inode->desc->mtime = time();
+    inode->atime = inode->desc->mtime;
+
+    // todo 写入磁盘 ？
+    bwrite(inode->buf);
+
+    // 返回写大小
+    return offset - begin;
+}
+
 void inode_init()
 {
     for (size_t i = 0; i < INODE_NR; i++)
@@ -145,11 +260,4 @@ void inode_init()
         inode_t *inode = &inode_table[i];
         inode->dev = EOF;
     }
-    
 }
-
-
-
-
-
-
