@@ -45,6 +45,8 @@ typedef u32 idx_t;
 typedef int32 pid_t;
 typedef int32 dev_t;
 
+typedef u16 mode_t; // 文件权限
+
 typedef int32 fd_t;
 // 标准文件描述符
 typedef enum std_fd_t

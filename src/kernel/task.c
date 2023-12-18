@@ -252,11 +252,13 @@ static task_t *task_create(target_t target, const char *name, u32 priority, u32 
     task->jiffies = 0;
     task->state = TASK_READY;
     task->uid = uid;
+    task->gid = 0; // todo group
     task->vmap = &kernel_map;
     task->pde = KERNEL_PAGE_DIR;
     task->brk = KERNEL_MEMORY_SIZE;
     task->iroot = get_root_inode();
     task->ipwd = get_root_inode();
+    task->umask = 0022 ; // 对应0755
 
     task->magic = PHINIX_MAGIC;
 
@@ -483,5 +485,5 @@ void task_init()
     task_setup();
     idle_task = task_create(idle_thread, "idle", 1, KERNEL_USER);
     task_create(init_thread, "init", 5, NORMAL_USER);
-    task_create(test_thread, "test", 5, KERNEL_USER);
+    task_create(test_thread, "test", 5, NORMAL_USER);
 }
