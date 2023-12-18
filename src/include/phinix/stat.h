@@ -30,20 +30,20 @@
 #define ISSYM(m) (((m) & IFMT) == IFSYM)  // 是符号连接文件
 
 // 文件访问权限
-#define IRWXG 00700 // 宿主可以读、写、执行/搜索
-#define IRGRP 00400 // 宿主读许可
-#define IWGRP 00200 // 宿主写许可
-#define IXGRP 00100 // 宿主执行/搜索许可
+#define IRWXU 00700 // 宿主可以读、写、执行/搜索
+#define IRUSR 00400 // 宿主读许可
+#define IWUSR 00200 // 宿主写许可
+#define IXUSR 00100 // 宿主执行/搜索许可
 
 #define IRWXG 00070 // 组成员可以读、写、执行/搜索
 #define IRGRP 00040 // 组成员读许可
 #define IWGRP 00020 // 组成员写许可
 #define IXGRP 00010 // 组成员执行/搜索许可
 
-#define IRWXG 00007 // 其他人可以读、写、执行/搜索
-#define IRGRP 00004 // 其他人读许可
-#define IWGRP 00002 // 其他人写许可
-#define IXGRP 00001 // 其他人执行/搜索许可
+#define IRWXO 00007 // 其他人可以读、写、执行/搜索
+#define IROTH 00004 // 其他人读许可
+#define IWOTH 00002 // 其他人写许可
+#define IXOTH 00001 // 其他人执行/搜索许可
 
 // 文件系统状态
 typedef struct stat_t

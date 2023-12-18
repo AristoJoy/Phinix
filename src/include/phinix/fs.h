@@ -106,4 +106,10 @@ inode_t *iget(dev_t dev, idx_t nr);
 // 释放inode
 void iput(inode_t *inode);
 
+// 获取pathname对应的父目录inode
+inode_t *named(char *pathname, char **next);
+
+// 获取pathname对应的inode
+inode_t *namei(char *pathname);
+
 #endif
