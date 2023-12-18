@@ -113,6 +113,13 @@ void iput(inode_t *inode)
     {
         return;
     }
+
+    // todo need write ?
+    if (inode->buf->dirty)
+    {
+        bwrite(inode->buf);
+    }
+    
     
     inode->count--;
 

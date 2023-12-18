@@ -67,8 +67,7 @@ void test_thread()
 {
     set_interrupt_state(true);
     // u32 counter = 0;
-    // test();
-    mode_t mode = umask(0002);
+    test();
     while (true)
     {
         // printf("test thread %d %d %d...\n", getpid(), getppid(), counter++);
