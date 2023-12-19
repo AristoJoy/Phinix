@@ -67,13 +67,11 @@ void test_thread()
 {
     set_interrupt_state(true);
     // u32 counter = 0;
-    test();
+    // test();
+    mkdir("/world.txt", 0755);
+    rmdir("/empty");
     while (true)
     {
-        // printf("test thread %d %d %d...\n", getpid(), getppid(), counter++);
-
-        // BOCHS_MAGIC_BP;
-        // test();
         sleep(10);
 
     }

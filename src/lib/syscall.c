@@ -96,6 +96,18 @@ int32 write(fd_t fd, char *buf, u32 len)
     return _syscall3(SYS_NR_WRITE, fd, (u32)buf, len);
 }
 
+// 创建目录
+int mkdir(char *pathname, int mode)
+{
+    return _syscall2(SYS_NR_MKDIR, (u32)pathname, (u32)mode);
+}
+
+// 删除目录
+int rmdir(char *pathname)
+{
+    return _syscall1(SYS_NR_RMDIR, (u32)pathname);
+}
+
 // 获取从1970 1 1 00:00:00 开始的秒数
 time_t time()
 {
