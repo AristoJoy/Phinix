@@ -28,6 +28,21 @@
 #define SEPARATOR2 '\\'                                      // 目录分隔符2
 #define IS_SEPARATOR(c) (c == SEPARATOR1 || c == SEPARATOR2) // 字符释放为目录分隔符
 
+// 文件标志
+enum file_flag
+{
+    O_RDONLY = 00,      // 只读方式
+    O_WRONLY = 01,      // 只写方式
+    O_RDWR = 02,        // 读写方式
+    O_ACCMODE = 03,     // 文件访问模式屏蔽码
+    O_CREAT = 00100,    // 如果文件不存在就创建
+    O_EXCL = 00200,     // 独占使用文件标志
+    O_NOCTTY = 00400,   // 不分配控制终端
+    O_TRUNC = 01000,    // 若文件已存在且是写操作，则长度截为0
+    O_APPEND = 02000,   // 以添加方式打开，文件指针置为文件尾
+    O_NONBLOCK = 04000, // 非阻塞方式打开和操作文件
+};
+
 // inode描述符
 typedef struct inode_desc_t
 {
@@ -111,6 +126,9 @@ inode_t *named(char *pathname, char **next);
 
 // 获取pathname对应的inode
 inode_t *namei(char *pathname);
+
+// 打开文件，返回inode
+inode_t *inode_open(char *pathname, int flag, int mode);
 
 // 从 inode 的 offset 处，读 len 个字节到 buf
 int inode_read(inode_t *inode, char *buf, u32 len, off_t offset);
