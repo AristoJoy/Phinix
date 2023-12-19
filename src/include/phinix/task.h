@@ -10,6 +10,8 @@
 
 #define TASK_NAME_LEN 16
 
+#define TASK_FILE_NR 16 // 进程文件数量
+
 typedef void target_t();
 
 typedef enum task_state_t
@@ -44,6 +46,7 @@ typedef struct task_t
     struct inode_t *ipwd;     // 进程当前目录inode
     struct inode_t *iroot;    // 进程根目录inode
     u16 umask;                // 进程用户权限
+    struct file_t *files[TASK_FILE_NR]; //进程文件表
     u32 magic;                // 内核魔数，用于检测栈溢出
 } task_t;
 
@@ -113,5 +116,8 @@ pid_t sys_getpid();
 
 // 获取父任务id
 pid_t sys_getppid();
+
+fd_t task_get_fd(task_t *task);
+void task_put_fd(task_t *task, fd_t fd);
 
 #endif
