@@ -261,3 +261,62 @@ void inode_init()
         inode->dev = EOF;
     }
 }
+
+// 释放inode索引块
+static void inode_bfree(inode_t *inode, u16 *array, int index, int level)
+{
+    // 如果块索引不存在
+    if (!array[index])
+    {
+        return;
+    }
+    
+    // 最底层的块索引
+    if (!level)
+    {
+        // 释放索引对应的文件块
+        bfree(inode->dev, array[index]);
+        return;
+    }
+    // 处理间接块
+    // 先读取下一级文件块索引
+    buffer_t *buf = bread(inode->dev, array[index]);
+    // 释放下一级索引块
+    for (size_t i = 0; i < BLOCK_INDEXES; i++)
+    {
+        inode_bfree(inode, (u16 *)buf->data, i, level - 1);
+    }
+    // 释放缓冲
+    brelse(buf);
+    // 释放间接文件块
+    bfree(inode->dev, array[index]);
+}
+
+// 释放inode所有文件块
+void inode_truncate(inode_t *inode)
+{
+    if (!ISFILE(inode->desc->mode) && !ISDIR(inode->desc->mode))
+    {
+        return;
+    }
+    
+    // 释放直接块
+    for (size_t i = 0; i < DIRECT_BLOCK; i++)
+    {
+        inode_bfree(inode, inode->desc->zone, i, 0);
+        inode->desc->zone[i] = 0;
+    }
+    
+    // 释放一级间接块
+    inode_bfree(inode, inode->desc->zone, DIRECT_BLOCK, 1);
+    inode->desc->zone[DIRECT_BLOCK] = 0;
+
+    // 释放二级间接块
+    inode_bfree(inode, inode->desc->zone, DIRECT_BLOCK + 1, 2);
+    inode->desc->zone[DIRECT_BLOCK + 1] = 0;
+
+    inode->desc->size = 0;
+    inode->buf->dirty = true;
+    inode->desc->mtime = time();
+    bwrite(inode->buf);
+}
