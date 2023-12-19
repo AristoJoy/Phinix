@@ -108,6 +108,18 @@ int rmdir(char *pathname)
     return _syscall1(SYS_NR_RMDIR, (u32)pathname);
 }
 
+// 链接文件
+int link(char *oldname, char *newname)
+{
+    return _syscall2(SYS_NR_LINK, (u32)oldname, (u32)newname);
+}
+
+// 删除链接文件
+int unlink(char *filename)
+{
+    return _syscall1(SYS_NR_UNLINK, (u32)filename);
+}
+
 // 获取从1970 1 1 00:00:00 开始的秒数
 time_t time()
 {

@@ -229,13 +229,13 @@ inode_t *named(char *pathname, char **next)
     {
         return inode;
     }
-    
+
     char *right = strrsep(left);
     if (!right || right < left)
     {
         return inode;
     }
-    
+
     right++;
 
     *next = left;
@@ -261,7 +261,7 @@ inode_t *named(char *pathname, char **next)
         {
             goto success;
         }
-        
+
         left = *next;
     }
 success:
@@ -272,7 +272,6 @@ failure:
     brelse(buf);
     iput(inode);
     return NULL;
-    
 }
 
 // 获取pathname对应的inode
@@ -289,7 +288,7 @@ inode_t *namei(char *pathname)
     {
         return dir;
     }
-    
+
     char *name = next;
     dentry_t *entry = NULL;
     buffer_t *buf = find_entry(&dir, name, &next, &entry);
@@ -298,7 +297,7 @@ inode_t *namei(char *pathname)
         iput(dir);
         return NULL;
     }
-    
+
     inode_t *inode = iget(dir->dev, entry->nr);
     iput(dir);
     brelse(buf);
@@ -339,13 +338,13 @@ int sys_mkdir(char *pathname, int mode)
     {
         goto rollback;
     }
-    
+
     // 在父目录下添加一个entry
     ebuf = add_entry(dir, name, &entry);
     ebuf->dirty = true;
     // 将目录项inode索引执行新分配的inode的block
     entry->nr = ialloc(dir->dev);
-    
+
     task_t *task = running_task();
 
     // 获取索引的inode
@@ -357,9 +356,9 @@ int sys_mkdir(char *pathname, int mode)
     inode->desc->uid = task->uid;
     inode->desc->mode = (mode & 0777 & ~task->umask) | IFDIR;
     inode->desc->size = sizeof(dentry_t) * 2; // 当前目录和父目录两个目录项
-    inode->desc->mtime = time(); // 时间戳
+    inode->desc->mtime = time();              // 时间戳
     inode->desc->nlinks = 2;
-    
+
     // 父目录
     dir->buf->dirty = true;
     dir->desc->nlinks++; // 当前目录的..目录项指向父目录
@@ -403,7 +402,6 @@ static bool is_empty(inode_t *inode)
         LOGK("bad directory on dev %d\n", inode->dev);
         return false;
     }
-    
 
     idx_t block = 0;
     buffer_t *buf = NULL;
@@ -426,9 +424,8 @@ static bool is_empty(inode_t *inode)
         {
             count++;
         }
-        
     }
-    
+
     brelse(buf);
 
     if (count < 2)
@@ -436,7 +433,7 @@ static bool is_empty(inode_t *inode)
         LOGK("bad directory on dev %d\n", inode->dev);
         return false;
     }
-    
+
     return count == 2;
 }
 
@@ -503,12 +500,12 @@ int sys_rmdir(char *pathname)
     {
         goto rollback;
     }
-    
+
     if (!is_empty(inode))
     {
         goto rollback;
     }
-    
+
     assert(inode->desc->nlinks == 2);
 
     // 释放文件块（删除目录项）
@@ -527,7 +524,7 @@ int sys_rmdir(char *pathname)
     dir->buf->dirty = true;
     assert(dir->desc->nlinks > 0);
 
-    entry->nr =0;
+    entry->nr = 0;
     ebuf->dirty = true;
 
     ret = 0;
@@ -535,5 +532,139 @@ rollback:
     iput(inode);
     iput(dir);
     brelse(ebuf);
+    return ret;
+}
+
+// 链接文件
+int sys_link(char *oldname, char *newname)
+{
+    int ret = EOF;
+    buffer_t *buf = NULL;
+    inode_t *dir = NULL;
+    inode_t *inode = namei(oldname);
+    if (!inode)
+    {
+        goto rollback;
+    }
+
+    if (ISDIR(inode->desc->mode))
+    {
+        goto rollback;
+    }
+
+    char *next = NULL;
+    dir = named(newname, &next);
+    if (!dir)
+    {
+        goto rollback;
+    }
+
+    if (!(*next))
+    {
+        goto rollback;
+    }
+
+    if (dir->dev != inode->dev)
+    {
+        goto rollback;
+    }
+
+    if (!permission(dir, P_WRITE))
+    {
+        goto rollback;
+    }
+
+    char *name = next;
+    dentry_t *entry;
+
+    buf = find_entry(&dir, name, &next, &entry);
+    // 目录项存在
+    if (buf)
+    {
+        goto rollback;
+    }
+
+    buf = add_entry(dir, name, &entry);
+    entry->nr = inode->nr;
+    buf->dirty = true;
+
+    inode->desc->nlinks++;
+    inode->ctime = time();
+    inode->buf->dirty = true;
+    ret = 0;
+
+rollback:
+    brelse(buf);
+    iput(inode);
+    iput(dir);
+    return ret;
+}
+
+// 删除链接文件
+int sys_unlink(char *filename)
+{
+    int ret = EOF;
+    char *next = NULL;
+    inode_t *inode = NULL;
+    buffer_t *buf = NULL;
+    inode_t *dir = named(filename, &next);
+    if (!dir)
+    {
+        goto rollback;
+    }
+    if (!(*next))
+    {
+        goto rollback;
+    }
+
+    if (!permission(dir, P_WRITE))
+    {
+        goto rollback;
+    }
+
+    char *name = next;
+    dentry_t *entry;
+
+    buf = find_entry(&dir, name, &next, &entry);
+    if (!buf)
+    {
+        goto rollback;
+    }
+
+    inode = iget(dir->dev, entry->nr);
+    if (ISDIR(inode->desc->mode))
+    {
+        goto rollback;
+    }
+
+    task_t *task = running_task();
+    if ((inode->desc->mode & ISVTX) && task->uid != inode->desc->uid)
+    {
+        goto rollback;
+    }
+
+    if (!inode->desc->nlinks)
+    {
+        LOGK("deleting non exists file (%04x:%d)\n", inode->dev, inode->nr);
+    }
+    
+    entry->nr = 0;
+    buf->dirty = true;
+
+    inode->desc->nlinks--;
+    inode->buf->dirty = true;
+
+    if (inode->desc->nlinks == 0)
+    {
+        inode_truncate(inode);
+        ifree(inode->dev, inode->nr);
+    }
+    
+    ret = 0;
+    
+rollback:
+    brelse(buf);
+    iput(inode);
+    iput(dir);
     return ret;
 }

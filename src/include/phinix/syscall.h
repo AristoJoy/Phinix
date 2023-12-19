@@ -10,6 +10,8 @@ typedef enum syscall_t
     SYS_NR_FORK = 2,
     SYS_NR_WRITE = 4,
     SYS_NR_WAITPID = 7,
+    SYS_NR_LINK = 9,
+    SYS_NR_UNLINK = 10,
     SYS_NR_TIME = 13,
     SYS_NR_GETPID = 20,
     SYS_NR_MKDIR = 39,
@@ -47,6 +49,12 @@ int32 write(fd_t fd, char *buf, u32 len);
 int mkdir(char *pathname, int mode);
 // 删除目录
 int rmdir(char *pathname);
+
+// 链接文件
+int link(char *oldname, char *newname);
+
+// 删除链接文件
+int unlink(char *filename);
 
 // 获取从1970 1 1 00:00:00 开始的秒数
 time_t time();
