@@ -32,50 +32,12 @@ static void syscall_default()
 task_t *task = NULL;
 
 static u32 sys_test()
-{
-
-    char ch;
-    device_t *device;
-
-    device = device_find(DEV_KEYBOARD, 0);
-    assert(device);
-
-    device_read(device->dev, &ch, 1, 0, 0);
-
-    device = device_find(DEV_CONSOLE, 0);
-    assert(device);
-
-    device_write(device->dev, &ch, 1, 0, 0);
-
-    // device = device_find(DEV_IDE_DISK, 0);
-
-    // assert(device);
-
-    // buffer_t *buf = bread(device->dev, 0); // 读取主引导块
-
-    // char *data = buf->data + SECTOR_SIZE;
-
-    // memset(data, 0x5a, SECTOR_SIZE);
-
-    // buf->dirty = true;
-
-    // brelse(buf);
-    
+{    
     return 255;
 }
 
-extern int32 console_write();
-
-int32 sys_write(fd_t fd, char *buf, u32 len)
-{
-    if (fd == stdout || fd == stderr)
-    {
-        return console_write(NULL, buf, len);
-    }
-    // todo
-    panic("sys write error!!!");
-    return 0;
-}
+extern int sys_read();
+extern int sys_write();
 
 extern fd_t sys_open();
 extern fd_t sys_create();
@@ -112,6 +74,7 @@ void syscall_init()
 
     syscall_table[SYS_NR_BRK] = sys_brk;
 
+    syscall_table[SYS_NR_READ] = sys_read;
     syscall_table[SYS_NR_WRITE] = sys_write;
 
     syscall_table[SYS_NR_MKDIR] = sys_mkdir;

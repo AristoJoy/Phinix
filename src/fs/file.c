@@ -1,6 +1,7 @@
 #include <phinix/fs.h>
 #include <phinix/assert.h>
 #include <phinix/task.h>
+#include <phinix/device.h>
 
 #define FILE_NR 128
 
@@ -91,4 +92,59 @@ void sys_close(fd_t fd)
     assert(file->inode);
     put_file(file);
     task_put_fd(task, fd);
+}
+
+// 读文件
+int sys_read(fd_t fd, char *buf, int len)
+{
+    if (fd == stdin)
+    {
+        device_t *device = device_find(DEV_KEYBOARD, 0);
+        return device_read(device->dev, buf, len, 0, 0);
+    }
+    
+    task_t *task = running_task();
+    file_t *file = task->files[fd];
+    assert(file);
+    assert(len > 0);
+
+    if ((file->flags & O_ACCMODE) == O_WRONLY)
+    {
+        return EOF;
+    }
+
+    inode_t *inode= file->inode;
+    int count = inode_read(inode, buf, len, file->offset);
+    if (count != EOF)
+    {
+        file->offset += count;
+    }
+    return count;
+}
+
+// 系统调用write
+int sys_write(fd_t fd, char *buf, u32 len)
+{
+    if (fd == stdout || fd == stderr)
+    {
+        device_t *device = device_find(DEV_CONSOLE, 0);
+        return device_write(device->dev, buf, len, 0, 0);
+    }
+    task_t *task = running_task();
+    file_t *file = task->files[fd];
+    assert(file);
+    assert(len > 0);
+
+    if ((file->flags & O_ACCMODE) == O_RDONLY)
+    {
+        return EOF;
+    }
+
+    inode_t *inode = file->inode;
+    int count = inode_write(inode, buf, len, file->offset);
+    if (count != EOF)
+    {
+        file->offset += count;
+    }
+    return count;
 }
