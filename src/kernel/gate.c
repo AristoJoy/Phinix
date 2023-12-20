@@ -44,6 +44,10 @@ extern fd_t sys_open();
 extern fd_t sys_create();
 extern void sys_close();
 
+extern int sys_chdir();
+extern int sys_chroot();
+extern char *sys_getcwd();
+
 extern int sys_mkdir();
 extern int sys_rmdir();
 
@@ -78,6 +82,10 @@ void syscall_init()
     syscall_table[SYS_NR_READ] = sys_read;
     syscall_table[SYS_NR_WRITE] = sys_write;
     syscall_table[SYS_NR_LSEEK] = sys_lseek;
+
+    syscall_table[SYS_NR_GETCWD] = sys_getcwd;
+    syscall_table[SYS_NR_CHDIR] = sys_chdir;
+    syscall_table[SYS_NR_CHROOT] = sys_chroot;
 
     syscall_table[SYS_NR_MKDIR] = sys_mkdir;
     syscall_table[SYS_NR_RMDIR] = sys_rmdir;

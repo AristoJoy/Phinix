@@ -126,6 +126,24 @@ int lseek(fd_t fd, off_t offset, int whence)
     return _syscall3(SYS_NR_LSEEK, fd, offset, whence);
 }
 
+// 获取当前路径
+char *getcwd(char *buf, size_t size)
+{
+    return _syscall2(SYS_NR_GETCWD, (u32)buf, (u32)size);
+}
+
+// 切换当前目录
+int chdir(char *pathname)
+{
+    return _syscall1(SYS_NR_CHDIR, (u32)pathname);
+}
+
+// 切换根目录
+int chroot(char *pathname)
+{
+    return _syscall1(SYS_NR_CHROOT, (u32)pathname);
+}
+
 // 创建目录
 int mkdir(char *pathname, int mode)
 {
