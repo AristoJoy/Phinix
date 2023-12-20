@@ -120,6 +120,12 @@ int write(fd_t fd, char *buf, u32 len)
     return _syscall3(SYS_NR_WRITE, fd, (u32)buf, len);
 }
 
+// 读取目录
+int readdir(fd_t fd, void *dir, int count)
+{
+    return _syscall3(SYS_NR_READDIR, fd, (u32)dir, (u32)count);
+}
+
 // 设置文件偏移量
 int lseek(fd_t fd, off_t offset, int whence)
 {
@@ -177,4 +183,9 @@ time_t time()
 mode_t umask(mode_t mask)
 {
     return _syscall1(SYS_NR_UMASK, (u32)mask);
+}
+
+void clear()
+{
+    _syscall0(SYS_NR_CLEAR);
 }

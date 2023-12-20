@@ -112,6 +112,8 @@ typedef struct file_t
     int mode;       // 文件模式
 } file_t;
 
+typedef dentry_t dirent_t;
+
 // 偏移量
 typedef enum whence_t
 {

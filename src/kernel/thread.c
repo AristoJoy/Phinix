@@ -27,14 +27,25 @@ void idle_thread()
     
 }
 
+extern void osh_main();
+
 static void user_init_thread()
 {
 
 
     while (true)
     {
-
-        sleep(1000);
+        u32 status;
+        pid_t pid = fork();
+        if (pid)
+        {
+            pid_t child = waitpid(pid, &status);
+            printf("wait pid %d status %d %d \n", child, status, time());
+        }
+        else
+        {
+            osh_main();
+        }
 
     }
     
@@ -47,23 +58,15 @@ void init_thread()
     task_to_user_mode(user_init_thread);
 }
 
+
 void test_thread()
 {
-    char buf[256];
-    memset(buf, 'A', sizeof(buf));
 
-    chroot("/d1");
-    chdir("/d2");
-    getcwd(buf, sizeof(buf));
-    printf("current work directory %s\n", buf);
 
     set_interrupt_state(true);
     while (true)
     {
-        // test();
-        char ch;
-        read(stdin, &ch, 1);
-        write(stdout, &ch, 1);
+
         sleep(10);
 
     }

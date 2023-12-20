@@ -33,12 +33,14 @@ task_t *task = NULL;
 
 static u32 sys_test()
 {    
+    LOGK("sys_test called!!!\n");
     return 255;
 }
 
 extern int sys_read();
 extern int sys_write();
 extern int sys_lseek();
+extern int sys_readdir();
 
 extern fd_t sys_open();
 extern fd_t sys_create();
@@ -56,6 +58,8 @@ extern int sys_unlink();
 
 extern time_t sys_time();
 extern mode_t sys_umask();
+
+extern void console_clear();
 
 void syscall_init()
 {
@@ -82,6 +86,7 @@ void syscall_init()
     syscall_table[SYS_NR_READ] = sys_read;
     syscall_table[SYS_NR_WRITE] = sys_write;
     syscall_table[SYS_NR_LSEEK] = sys_lseek;
+    syscall_table[SYS_NR_READDIR] = sys_readdir;
 
     syscall_table[SYS_NR_GETCWD] = sys_getcwd;
     syscall_table[SYS_NR_CHDIR] = sys_chdir;
@@ -100,4 +105,5 @@ void syscall_init()
     syscall_table[SYS_NR_TIME] = sys_time;
 
     syscall_table[SYS_NR_UMASK] = sys_umask;
+    syscall_table[SYS_NR_CLEAR] = console_clear;
 }
