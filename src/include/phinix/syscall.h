@@ -9,7 +9,10 @@ typedef enum syscall_t
     SYS_NR_EXIT = 1,
     SYS_NR_FORK = 2,
     SYS_NR_WRITE = 4,
+    SYS_NR_OPEN = 5,
+    SYS_NR_CLOSE = 6,
     SYS_NR_WAITPID = 7,
+    SYS_NR_CREAT = 8,
     SYS_NR_LINK = 9,
     SYS_NR_UNLINK = 10,
     SYS_NR_TIME = 13,
@@ -41,6 +44,15 @@ pid_t getppid();
 
 // brk调用
 int32 brk(void *addr);
+
+// 打开文件
+fd_t open(char *filename, int flags, int mode);
+
+// 创建普通文件
+fd_t create(char *filename, int mode);
+
+// 关闭文件
+void close(fd_t fd);
 
 // 系统调用write
 int32 write(fd_t fd, char *buf, u32 len);

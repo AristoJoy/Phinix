@@ -90,6 +90,24 @@ int32 brk(void *addr)
     return _syscall1(SYS_NR_BRK, (u32) addr);
 }
 
+// 打开文件
+fd_t open(char *filename, int flags, int mode)
+{
+    return _syscall3(SYS_NR_OPEN, (u32)filename, (u32)flags, (u32)mode);
+}
+
+// 创建普通文件
+fd_t create(char *filename, int mode)
+{
+    return _syscall2(SYS_NR_CREAT, (u32)filename, (u32)mode);
+}
+
+// 关闭文件
+void close(fd_t fd)
+{
+    return _syscall1(SYS_NR_CLOSE, (u32)fd);
+}
+
 // 系统调用write
 int32 write(fd_t fd, char *buf, u32 len)
 {

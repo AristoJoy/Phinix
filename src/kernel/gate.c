@@ -77,6 +77,10 @@ int32 sys_write(fd_t fd, char *buf, u32 len)
     return 0;
 }
 
+extern fd_t sys_open();
+extern fd_t sys_create();
+extern void sys_close();
+
 extern int sys_mkdir();
 extern int sys_rmdir();
 
@@ -112,6 +116,10 @@ void syscall_init()
 
     syscall_table[SYS_NR_MKDIR] = sys_mkdir;
     syscall_table[SYS_NR_RMDIR] = sys_rmdir;
+
+    syscall_table[SYS_NR_OPEN] = sys_open;
+    syscall_table[SYS_NR_CLOSE] = sys_close;
+    syscall_table[SYS_NR_CREAT] = sys_create;
 
     syscall_table[SYS_NR_LINK] = sys_link;
     syscall_table[SYS_NR_UNLINK] = sys_unlink;
