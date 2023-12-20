@@ -120,6 +120,12 @@ int write(fd_t fd, char *buf, u32 len)
     return _syscall3(SYS_NR_WRITE, fd, (u32)buf, len);
 }
 
+// 设置文件偏移量
+int lseek(fd_t fd, off_t offset, int whence)
+{
+    return _syscall3(SYS_NR_LSEEK, fd, offset, whence);
+}
+
 // 创建目录
 int mkdir(char *pathname, int mode)
 {

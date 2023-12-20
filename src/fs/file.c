@@ -54,7 +54,7 @@ fd_t sys_open(char *filename, int flags, int mode)
     {
         return EOF;
     }
-    
+
     task_t *task = running_task();
     fd_t fd = task_get_fd(task);
     file_t *file = get_file();
@@ -83,7 +83,7 @@ fd_t sys_create(char *filename, int mode)
 void sys_close(fd_t fd)
 {
     assert(fd < TASK_FILE_NR);
-    task_t *task =running_task();
+    task_t *task = running_task();
     file_t *file = task->files[fd];
     if (!file)
     {
@@ -102,7 +102,7 @@ int sys_read(fd_t fd, char *buf, int len)
         device_t *device = device_find(DEV_KEYBOARD, 0);
         return device_read(device->dev, buf, len, 0, 0);
     }
-    
+
     task_t *task = running_task();
     file_t *file = task->files[fd];
     assert(file);
@@ -113,7 +113,7 @@ int sys_read(fd_t fd, char *buf, int len)
         return EOF;
     }
 
-    inode_t *inode= file->inode;
+    inode_t *inode = file->inode;
     int count = inode_read(inode, buf, len, file->offset);
     if (count != EOF)
     {
@@ -147,4 +147,35 @@ int sys_write(fd_t fd, char *buf, u32 len)
         file->offset += count;
     }
     return count;
+}
+
+int sys_lseek(fd_t fd, off_t offset, whence_t whence)
+{
+    assert(fd < TASK_FILE_NR);
+
+    task_t *task = running_task();
+    file_t *file = task->files[fd];
+
+    assert(file);
+    assert(file->inode);
+
+    switch (whence)
+    {
+    case SEEK_SET:
+        assert(offset >= 0);
+        file->offset = offset;
+        break;
+    case SEEK_CUR:
+        assert(offset >= 0);
+        file->offset += offset;
+        break;
+    case SEEK_END:
+        assert(offset >= 0);
+        file->offset = file->inode->desc->size + offset;
+        break;
+    default:
+        panic("whence not defined!!!");
+        break;
+    }
+    return file->offset;
 }
