@@ -189,3 +189,14 @@ void clear()
 {
     _syscall0(SYS_NR_CLEAR);
 }
+
+// 获取文件状态
+int stat(char *filename, stat_t *statbuf)
+{
+    return _syscall2(SYS_NR_STAT, (u32)filename, (u32)statbuf);
+}
+// 通过文件描述符获取文件状态
+int fstat(fd_t fd, stat_t *statbuf)
+{
+    return _syscall2(SYS_NR_FSTAT, (u32)fd, (u32)statbuf);
+}
