@@ -20,7 +20,7 @@ static char phinix_logo[][52] = {
     "           \\______   \\  |__ |__| ____ |__|__  ___\n\t",
     "            |     ___/  |  \\|  |/    \\|  \\  \\/  /\n\t",
     "            |    |   |   Y  \\  |   |  \\  |>    < \n\t",
-    "            |____|   |___|  /__|___|  /__/__/\\_ \\n\t",
+    "            |____|   |___|  /__|___|  /__/__/\\_ \\\n\t",
     "                          \\/        \\/         \\/\n\t",
 };
 
@@ -54,7 +54,10 @@ void print_prompt()
 void builtin_logo()
 {
     clear();
-    printf((char *)phinix_logo);
+    for (size_t i = 0; i < 6; i++)
+    {
+        printf(phinix_logo[i]);
+    }
 }
 
 void builtin_test(int argc, char *argv[])
@@ -154,7 +157,7 @@ void builtin_rm(int argc, char *argv[])
     if (argc < 2)
     {
         return;
-    }
+    }   
     unlink(argv[1]);
 }
 
@@ -206,7 +209,7 @@ static void execute(int argc, char *argv[])
     if (!strcmp(line, "rmdir"))
     {
         return builtin_rmdir(argc, argv);
-    }
+    } 
     if (!strcmp(line, "rm"))
     {
         return builtin_rm(argc, argv);
