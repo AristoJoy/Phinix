@@ -174,6 +174,11 @@ int unlink(char *filename)
     return _syscall1(SYS_NR_UNLINK, (u32)filename);
 }
 
+int mknod(char *filename, int mode, int dev)
+{
+    return _syscall3(SYS_NR_MKNOD, (u32)filename, (u32)mode, (u32)dev);
+}
+
 // 获取从1970 1 1 00:00:00 开始的秒数
 time_t time()
 {

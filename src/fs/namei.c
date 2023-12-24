@@ -348,15 +348,9 @@ int sys_mkdir(char *pathname, int mode)
     task_t *task = running_task();
 
     // 获取索引的inode
-    inode_t *inode = iget(dir->dev, entry->nr);
-    inode->buf->dirty = true;
-
-    // 文件inode描述符属性赋值
-    inode->desc->gid = task->gid;
-    inode->desc->uid = task->uid;
+    inode_t *inode = new_inode(dir->dev, entry->nr);
     inode->desc->mode = (mode & 0777 & ~task->umask) | IFDIR;
     inode->desc->size = sizeof(dentry_t) * 2; // 当前目录和父目录两个目录项
-    inode->desc->mtime = time();              // 时间戳
     inode->desc->nlinks = 2;
 
     // 父目录
@@ -647,7 +641,7 @@ int sys_unlink(char *filename)
     {
         LOGK("deleting non exists file (%04x:%d)\n", inode->dev, inode->nr);
     }
-    
+
     entry->nr = 0;
     buf->dirty = true;
 
@@ -659,9 +653,9 @@ int sys_unlink(char *filename)
         inode_truncate(inode);
         ifree(inode->dev, inode->nr);
     }
-    
+
     ret = 0;
-    
+
 rollback:
     brelse(buf);
     iput(inode);
@@ -675,7 +669,7 @@ inode_t *inode_open(char *pathname, int flag, int mode)
     inode_t *dir = NULL;
     inode_t *inode = NULL;
     buffer_t *buf = NULL;
-    dentry_t *entry =NULL;
+    dentry_t *entry = NULL;
     char *next = NULL;
     dir = named(pathname, &next);
     if (!dir)
@@ -700,40 +694,33 @@ inode_t *inode_open(char *pathname, int flag, int mode)
         inode = iget(dir->dev, entry->nr);
         goto makeup;
     }
-    
+
     if (!(flag & O_CREAT))
     {
         goto rollback;
     }
-    
+
     if (!permission(dir, P_WRITE))
     {
         goto rollback;
     }
-    
+
     buf = add_entry(dir, name, &entry);
     entry->nr = ialloc(dir->dev);
-    inode = iget(dir->dev, entry->nr);
+    inode = new_inode(dir->dev, entry->nr);
 
     task_t *task = running_task();
 
-    mode &= (0777 &~task->umask);
+    mode &= (0777 & ~task->umask);
     mode |= IFREG;
-
-    inode->desc->uid = task->uid;
-    inode->desc->gid = task->gid;
     inode->desc->mode = mode;
-    inode->desc->mtime = time();              // 时间戳
-    inode->desc->size = 0;
-    inode->desc->nlinks = 1;
-    inode->buf->dirty = true;
 
 makeup:
     if (!permission(inode, flag & O_ACCMODE))
     {
         goto rollback;
     }
-    
+
     if (ISDIR(inode->desc->mode) && ((flag & O_ACCMODE) != O_RDONLY))
     {
         goto rollback;
@@ -820,6 +807,7 @@ void abspath(char *pwd, const char *pathname)
         strcpy(cur, pathname);
         cur += strlen(pathname);
         *cur = '/';
+        *(cur + 1) = '\0';
         return;
     }
     if (cur - 1 != pwd)
@@ -851,7 +839,7 @@ int sys_chdir(char *pathname)
     return 0;
 rollback:
     iput(inode);
-    return EOF;    
+    return EOF;
 }
 
 // 切换根目录
@@ -874,4 +862,55 @@ int sys_chroot(char *pathname)
 rollback:
     iput(inode);
     return EOF;
+}
+
+int sys_mknod(char *filename, int mode, int dev)
+{
+    char *next = NULL;
+    inode_t *dir = NULL;
+    inode_t *inode = NULL;
+    buffer_t *buf = NULL;
+    int ret = EOF;
+
+    dir = named(filename, &next);
+    if (!dir)
+    {
+        goto rollback;
+    }
+    if (!(*next))
+    {
+        goto rollback;
+    }
+    if (!permission(dir, P_WRITE))
+    {
+        goto rollback;
+    }
+
+    char *name = next;
+    dentry_t *entry;
+    buf = find_entry(&dir, name, &next, &entry);
+    if (buf)
+    {
+        goto rollback;
+    }
+
+    buf = add_entry(dir, name, &entry);
+    buf->dirty = true;
+    entry->nr = ialloc(dir->dev);
+
+    inode = new_inode(dir->dev, entry->nr);
+
+    inode->desc->mode = mode;
+    if (ISBLK(mode) || ISCHR(mode))
+    {
+        inode->desc->zone[0] = dev;
+    }
+
+    ret = 0;
+
+rollback:
+    brelse(buf);
+    iput(inode);
+    iput(dir);
+    return ret;
 }
