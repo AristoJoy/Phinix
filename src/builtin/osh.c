@@ -265,6 +265,24 @@ void builtin_date(int argc, char *argv[])
     printf("%s\n", buf);
 }
 
+void builtin_mount(int argc, char *argv[])
+{
+    if (argc < 3)
+    {
+        return;
+    }
+    mount(argv[1], argv[2], 0);
+}
+
+void builtin_umount(int argc, char *argv[])
+{
+    if (argc < 2)
+    {
+        return;
+    }
+    umount(argv[1]);
+}
+
 // 执行命令
 static void execute(int argc, char *argv[])
 {
@@ -321,6 +339,14 @@ static void execute(int argc, char *argv[])
     if (!strcmp(line, "date"))
     {
         return builtin_date(argc, argv);
+    }
+    if (!strcmp(line, "mount"))
+    {
+        return builtin_mount(argc, argv);
+    }
+    if (!strcmp(line, "umount"))
+    {
+        return builtin_umount(argc, argv);
     }
     printf("osh : command not found: %s\n", argv[0]);
 }

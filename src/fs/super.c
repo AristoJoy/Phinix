@@ -4,6 +4,7 @@
 #include <phinix/assert.h>
 #include <phinix/string.h>
 #include <phinix/debug.h>
+#include <phinix/stat.h>
 
 #define LOGK(fmt, args...) DEBUGK(fmt, ##args)
 
@@ -41,12 +42,43 @@ super_block_t *get_super(dev_t dev)
     return NULL;
     
 }
+
+// 释放超级块
+void put_super(super_block_t *sb)
+{
+    if (!sb)
+    {
+        return;
+    }
+
+    assert(sb->count > 0);
+    sb->count--;
+    if (sb->count)
+    {
+        return;
+    }
+    sb->dev = EOF;
+    iput(sb->imount);
+    iput(sb->iroot);
+    
+    for (size_t i = 0; i < sb->desc->imap_blocks; i++)
+    {
+        brelse(sb->imaps[i]);
+    }
+    for (size_t i = 0; i < sb->desc->zmap_blocks; i++)
+    {
+        brelse(sb->zmaps[i]);
+    }
+    brelse(sb->buf);
+}
+
 // 读取dev对应的超级块
 super_block_t *read_super(dev_t dev)
 {
     super_block_t *sb = get_super(dev);
     if (sb)
     {
+        sb->count++;
         return sb;
     }
     
@@ -61,6 +93,7 @@ super_block_t *read_super(dev_t dev)
     sb->buf = buf;
     sb->desc = (super_desc_t *)buf->data;
     sb->dev = dev;
+    sb->count = 1;
 
     assert(sb->desc->magic == MINIX1_MAGIC);
 
@@ -112,6 +145,7 @@ static void mount_root()
 
     root->iroot = iget(device->dev, 1);// 获取根目录inode
     root->imount = iget(device->dev, 1); // 根目录挂载inode
+    root->iroot->mount = device->dev;
 }
 
 void super_init()
@@ -127,52 +161,112 @@ void super_init()
         list_init(&sb->inode_list);
     }
     mount_root();
+}
 
+// 挂载设备
+int sys_mount(char *devname, char *dirname, int flags)
+{
+    LOGK("mount %s to %s\n", devname, dirname);
 
-    // device_t *device = device_find(DEV_IDE_PART, 0);
-    // assert(device);
+    inode_t *devinode = NULL;
+    inode_t *dirinode = NULL;
+    super_block_t *sb = NULL;
+    devinode = namei(devname);
+    if (!devinode)
+    {
+        goto rollback;
+    }
+    if (!ISBLK(devinode->desc->mode))
+    {
+        goto rollback;
+    }
 
-    // buffer_t *boot = bread(device->dev, 0);
-    // buffer_t *super = bread(device->dev, 1);
+    dev_t dev = devinode->desc->zone[0];
+    
+    dirinode = namei(dirname);
+    if (!dirinode)
+    {
+        goto rollback;
+    }
+    if (!ISDIR(dirinode->desc->mode))
+    {
+        goto rollback;
+    }
 
-    // super_desc_t *sb = (super_desc_t *)super->data;
-    // assert(sb->magic == MINIX1_MAGIC);
+    // 如果有其他目录指向dir或dir已挂载设备
+    if (dirinode->count != 1 || dirinode->mount)
+    {
+        goto rollback;
+    }
 
-    // // inode 位图
-    // buffer_t *imap = bread(device->dev, 2);
+    sb = read_super(dev);
+    sb->iroot = iget(dev, 1);
+    sb->imount = dirinode;
+    dirinode->mount = dev;
+    iput(devinode);
+    
+    return 0;
+rollback:
+    put_super(sb);
+    iput(dirinode);
+    iput(devinode);
+    return EOF;
+}
 
-    // // 块位图
-    // buffer_t *zmap = bread(device->dev, 2 + sb->imap_blocks);
+// 卸载设备
+int sys_umount(char *target)
+{
+    LOGK("umount %s\n", target);
+    inode_t *inode = NULL;
+    super_block_t *sb = NULL;
+    int ret = EOF;
 
-    // // 读取第一个inode块
-    // buffer_t *buf1 = bread(device->dev, 2 + sb->imap_blocks + sb->zmap_blocks);
-    // inode_desc_t *inode = (inode_desc_t *)buf1->data;
+    inode = namei(target);
+    if (!inode)
+    {
+        goto rollback;
+    }
+    if (!ISBLK(inode->desc->mode) && inode->nr != 1)
+    {
+        goto rollback;
+    }
 
-    // buffer_t *buf2 = bread(device->dev, inode->zone[0]);
+    if (inode == root->imount)
+    {
+        goto rollback;
+    }
 
-    // dentry_t *dir = (dentry_t *)buf2->data;
-    // inode_desc_t *helloi = NULL;
-    // while (dir->nr)
-    // {
-    //     LOGK("inode %4d, name %s\n", dir->nr, dir->name);
-    //     if (!strcmp(dir->name, "hello.txt"))
-    //     {
-    //         helloi = &((inode_desc_t *)buf1->data)[dir->nr - 1];
-    //         strcpy(dir->name, "world.txt");
-    //         buf2->dirty = true;
-    //         bwrite(buf2);
-    //     }
-    //     dir++;
-    // }
+    dev_t dev = inode->dev;
+    if (ISBLK(inode->desc->mode))
+    {
+        dev = inode->desc->zone[0];
+    }
+    
+    sb = get_super(dev);
+    if (!sb->imount)
+    {
+        goto rollback;
+    }
+    
+    if (!sb->imount->mount)
+    {
+        LOGK("warning super block mount = 0\n");
+    }
 
-    // buffer_t *buf3 = bread(device->dev, helloi->zone[0]);
-    // LOGK("content %s", buf3->data);
-
-    // strcpy(buf3->data, "This is modified content!!!\n");
-    // buf3->dirty = true;
-    // bwrite(buf3);
-
-    // helloi->size = strlen(buf3->data);
-    // buf1->dirty = true;
-    // bwrite(buf1);
+    if (list_size(&sb->inode_list) > 1)
+    {
+        goto rollback;
+    }
+    
+    iput(sb->iroot);
+    sb->iroot = NULL;
+    sb->imount->mount = 0;
+    iput(sb->imount);
+    sb->imount = NULL;
+    
+    ret = 0;
+rollback:
+    put_super(sb);
+    iput(inode);
+    return ret;
 }

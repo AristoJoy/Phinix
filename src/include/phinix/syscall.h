@@ -24,6 +24,8 @@ typedef enum syscall_t
     SYS_NR_STAT = 18,
     SYS_NR_LSEEK = 19,
     SYS_NR_GETPID = 20,
+    SYS_NR_MOUNT = 21,
+    SYS_NR_UMOUNT = 22,
     SYS_NR_FSTAT = 28,
     SYS_NR_MKDIR = 39,
     SYS_NR_RMDIR = 40,
@@ -110,6 +112,12 @@ void clear();
 int stat(char *filename, stat_t *statbuf);
 // 通过文件描述符获取文件状态
 int fstat(fd_t fd, stat_t *statbuf);
+
+// 挂载设备
+int mount(char *devname, char *dirname, int flags);
+
+// 卸载设备
+int umount(char *target);
 
 // 创建设备文件
 int mknod(char *filename, int mode, int dev);

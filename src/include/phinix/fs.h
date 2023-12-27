@@ -90,6 +90,7 @@ typedef struct super_block_t
     struct buffer_t *imaps[IMAP_NR]; // inode位图缓冲
     struct buffer_t *zmaps[ZMAP_NR]; // 块位图缓冲
     dev_t dev;                       // 设备号
+    u32 count;                       // 引用计数
     list_t inode_list;               // 使用中 inode链表
     inode_t *iroot;                  // 根目录 inode
     inode_t *imount;                 // 安装到的 inode

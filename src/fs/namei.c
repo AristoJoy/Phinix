@@ -113,6 +113,18 @@ static buffer_t *find_entry(inode_t **dir, const char *name, char **next, dentry
     // 保证dir是目录
     assert(ISDIR((*dir)->desc->mode));
 
+    // 父目录是根设备
+    if (match_name(name, "..", next) && (*dir)->nr == 1)
+    {
+        super_block_t *sb = get_super((*dir)->dev);
+        inode_t *inode = *dir;
+        // 将dir指向被挂载的目录，并且其引用计数加1
+        (*dir) = sb->imount;
+        (*dir)->count++;
+        iput(inode);
+    }
+    
+
     // 获取目录所在的超级块
     // super_block_t *sb = read_super((*dir)->dev);
 
@@ -332,7 +344,7 @@ int sys_mkdir(char *pathname, int mode)
     char *name = next;
     dentry_t *entry;
 
-    ebuf = find_entry(&dir, name, &next, entry);
+    ebuf = find_entry(&dir, name, &next, &entry);
     // 目录项已存在
     if (ebuf)
     {

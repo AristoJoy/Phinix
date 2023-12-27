@@ -68,6 +68,21 @@ static inode_t *find_inode(dev_t dev, idx_t nr)
     return NULL;
 }
 
+// 如果inode下面挂载了设备，就返回挂载设备的inode
+static inode_t *fit_inode(inode_t *inode)
+{
+    if (!inode->mount)
+    {
+        return inode;
+    }
+    super_block_t *sb = get_super(inode->mount);
+    assert(sb);
+    iput(inode);
+    inode = sb->iroot;
+    inode->count++;
+    return inode;
+}
+
 // 获取设备dev的nr inode
 inode_t *iget(dev_t dev, idx_t nr)
 {
@@ -76,7 +91,7 @@ inode_t *iget(dev_t dev, idx_t nr)
     {
         inode->count++;
         inode->atime = time();
-        return inode;
+        return fit_inode(inode);
     }
 
     super_block_t *sb = get_super(dev);

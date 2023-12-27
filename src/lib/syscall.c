@@ -174,6 +174,18 @@ int unlink(char *filename)
     return _syscall1(SYS_NR_UNLINK, (u32)filename);
 }
 
+// 挂载设备
+int mount(char *devname, char *dirname, int flags)
+{
+    return _syscall3(SYS_NR_MOUNT, (u32)devname, (u32)dirname, (u32)flags);
+}
+
+// 卸载设备
+int umount(char *target)
+{
+    return _syscall1(SYS_NR_UMOUNT, (u32)target);
+}
+
 int mknod(char *filename, int mode, int dev)
 {
     return _syscall3(SYS_NR_MKNOD, (u32)filename, (u32)mode, (u32)dev);
