@@ -38,6 +38,7 @@ typedef enum syscall_t
     SYS_NR_YIELD = 162,
     SYS_NR_GETCWD = 183,
     SYS_NR_CLEAR = 200,
+    SYS_NR_MKFS = 201,
 } syscall_t;
 
 u32 test();
@@ -121,5 +122,8 @@ int umount(char *target);
 
 // 创建设备文件
 int mknod(char *filename, int mode, int dev);
+
+// 格式化文件系统
+int mkfs(char *devname, int icount);
 
 #endif

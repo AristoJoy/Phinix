@@ -217,3 +217,9 @@ int fstat(fd_t fd, stat_t *statbuf)
 {
     return _syscall2(SYS_NR_FSTAT, (u32)fd, (u32)statbuf);
 }
+
+// 格式化文件系统
+int mkfs(char *devname, int icount)
+{
+    return _syscall2(SYS_NR_MKFS, (u32)devname, (u32)icount);
+}

@@ -5,6 +5,7 @@
 #include <phinix/string.h>
 #include <phinix/debug.h>
 #include <phinix/stat.h>
+#include <phinix/task.h>
 
 #define LOGK(fmt, args...) DEBUGK(fmt, ##args)
 
@@ -37,10 +38,8 @@ super_block_t *get_super(dev_t dev)
         {
             return sb;
         }
-        
     }
     return NULL;
-    
 }
 
 // 释放超级块
@@ -60,7 +59,7 @@ void put_super(super_block_t *sb)
     sb->dev = EOF;
     iput(sb->imount);
     iput(sb->iroot);
-    
+
     for (size_t i = 0; i < sb->desc->imap_blocks; i++)
     {
         brelse(sb->imaps[i]);
@@ -81,7 +80,7 @@ super_block_t *read_super(dev_t dev)
         sb->count++;
         return sb;
     }
-    
+
     LOGK("Reading super block of device %d\n", dev);
 
     // 获取空闲超级块
@@ -114,7 +113,6 @@ super_block_t *read_super(dev_t dev)
         {
             break;
         }
-        
     }
 
     for (size_t i = 0; i < sb->desc->zmap_blocks; i++)
@@ -143,7 +141,7 @@ static void mount_root()
     // 读根文件系统超级块
     root = read_super(device->dev);
 
-    root->iroot = iget(device->dev, 1);// 获取根目录inode
+    root->iroot = iget(device->dev, 1);  // 获取根目录inode
     root->imount = iget(device->dev, 1); // 根目录挂载inode
     root->iroot->mount = device->dev;
 }
@@ -182,7 +180,7 @@ int sys_mount(char *devname, char *dirname, int flags)
     }
 
     dev_t dev = devinode->desc->zone[0];
-    
+
     dirinode = namei(dirname);
     if (!dirinode)
     {
@@ -204,7 +202,7 @@ int sys_mount(char *devname, char *dirname, int flags)
     sb->imount = dirinode;
     dirinode->mount = dev;
     iput(devinode);
-    
+
     return 0;
 rollback:
     put_super(sb);
@@ -241,13 +239,13 @@ int sys_umount(char *target)
     {
         dev = inode->desc->zone[0];
     }
-    
+
     sb = get_super(dev);
     if (!sb->imount)
     {
         goto rollback;
     }
-    
+
     if (!sb->imount->mount)
     {
         LOGK("warning super block mount = 0\n");
@@ -257,16 +255,190 @@ int sys_umount(char *target)
     {
         goto rollback;
     }
-    
+
     iput(sb->iroot);
     sb->iroot = NULL;
     sb->imount->mount = 0;
     iput(sb->imount);
     sb->imount = NULL;
-    
+
     ret = 0;
 rollback:
     put_super(sb);
+    iput(inode);
+    return ret;
+}
+
+// 创建设备文件系统
+static int devmkfs(dev_t dev, int icount)
+{
+    super_block_t *sb = NULL;
+    buffer_t *buf = NULL;
+    int ret = EOF;
+
+    int total_block = device_ioctl(dev, DEV_CMD_SECTOR_COUNT, NULL, 0) / BLOCK_SECS;
+    assert(total_block);
+    assert(icount < total_block);
+
+    if (!icount)
+    {
+        icount = total_block / 3;
+    }
+
+    sb = get_free_super();
+
+    sb->dev = dev;
+    sb->count = 1;
+    
+    buf = bread(dev, 1);
+
+    sb->buf = buf;
+    buf->dirty = true;
+
+    // 初始化超级块
+    super_desc_t *desc = (super_desc_t *)buf->data;
+    sb->desc = desc;
+
+    int inode_blocks = div_round_up(icount * sizeof(inode_desc_t), BLOCK_SIZE);
+    desc->inodes = icount;
+    desc->zones = total_block;
+
+    desc->imap_blocks = div_round_up(icount, BLOCK_BITS);
+
+    int zcount = total_block - desc->imap_blocks - inode_blocks - 2;
+    desc->zmap_blocks = div_round_up(zcount, BLOCK_BITS);
+
+    desc->first_datazone = 2 + desc->imap_blocks + desc->zmap_blocks +  inode_blocks;
+    desc->log_zone_size = 0;
+    desc->max_size = BLOCK_SIZE * TOTAL_BLOCK;
+    desc->magic = PHINIX_MAGIC;
+
+    // 清空位图
+    memset(sb->imaps, 0, sizeof(sb->imaps));
+    memset(sb->zmaps, 0, sizeof(sb->zmaps));
+
+    int idx = 2;
+    for (size_t i = 0; i < sb->desc->imap_blocks; i++)
+    {
+        if (sb->imaps[i] = bread(dev, idx))
+        {
+            memset(sb->imaps[i]->data, 0, BLOCK_SIZE);
+            sb->imaps[i]->dirty = true;
+            idx++;
+        }
+        else
+        {
+            break;
+        }
+    }
+    for (size_t i = 0; i < sb->desc->zmap_blocks; i++)
+    {
+        if (sb->zmaps[i] = bread(dev, idx))
+        {
+            memset(sb->zmaps[i]->data, 0, BLOCK_SIZE);
+            sb->zmaps[i]->dirty = true;
+            idx++;
+        }
+        else
+        {
+            break;
+        }
+    }
+    // 初始化位图
+    idx = balloc(dev);
+
+    idx = ialloc(dev);
+    idx = ialloc(dev);
+
+    // 位图尾部置位
+    int counts[] = {
+        icount + 1,
+        zcount,
+    };
+
+    buffer_t *maps[] = {
+        sb->imaps[sb->desc->imap_blocks - 1],
+        sb->zmaps[sb->desc->zmap_blocks - 1],
+    };
+
+    for (size_t i = 0; i < 2; i++)
+    {
+        int count = counts[i];
+        buffer_t *map = maps[i];
+        map->dirty = true;
+        // 块偏移
+        int offset = count % (BLOCK_BITS);
+        int begin = offset / 8;
+
+        char *ptr = (char *)map->data + begin;
+        memset(ptr + 1, 0xff, BLOCK_SIZE - begin - 1);
+        int bits = 0x80;
+        char data = 0;
+        int remain = 8 - offset % 8;
+        while (remain--)
+        {
+            data |= bits;
+            bits >>= 1;
+        }
+        ptr[0] = data;
+    }
+    
+    // 创建根目录
+    task_t *task = running_task();
+
+    inode_t *iroot = new_inode(dev, 1);
+    sb->iroot = iroot;
+
+    iroot->desc->mode = (0777 & ~task->umask) | IFDIR;
+    iroot->desc->size = sizeof(dentry_t) * 2; // 当前目录和父目录两个目录项
+    iroot->desc->nlinks = 2;
+
+    buf = bread(dev, bmap(iroot, 0, true));
+    buf->dirty = true;
+
+    dentry_t *entry = (dentry_t *)buf->data;
+    memset(entry, 0, BLOCK_SIZE);
+
+    strcpy(entry->name, ".");
+    entry->nr = iroot->nr;
+
+    entry++;
+    strcpy(entry->name, "..");
+    entry->nr = iroot->nr;
+
+    brelse(buf);
+
+    ret = 0;
+
+rollback:
+    put_super(sb);
+    brelse(buf);
+    return ret;
+}
+
+// 格式化文件系统
+int sys_mkfs(char *devname, int icount)
+{
+    inode_t *inode = NULL;
+    int ret = EOF;
+
+    inode = namei(devname);
+    if (!inode)
+    {
+        goto rollback;
+    }
+
+    if (!ISBLK(inode->desc->mode))
+    {
+        goto rollback;
+    }
+
+    dev_t dev = inode->desc->zone[0];
+    assert(dev);
+
+    ret = devmkfs(dev, icount);
+
+rollback:
     iput(inode);
     return ret;
 }

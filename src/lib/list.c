@@ -101,7 +101,7 @@ bool list_empty(list_t *list)
 // 获取链表长度
 u32 list_size(list_t *list)
 {
-    list_node_t *next = &list->head.next;
+    list_node_t *next = list->head.next;
     u32 size = 0;
     while (next != &list->tail)
     {
