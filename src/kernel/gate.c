@@ -42,6 +42,8 @@ extern int sys_write();
 extern int sys_lseek();
 extern int sys_readdir();
 
+extern void sys_execve();
+
 extern fd_t sys_open();
 extern fd_t sys_create();
 extern void sys_close();
@@ -90,6 +92,8 @@ void syscall_init()
     
     syscall_table[SYS_NR_SLEEP] = task_sleep;
     syscall_table[SYS_NR_YIELD] = task_yield;
+
+    syscall_table[SYS_NR_EXECVE] = sys_execve;
 
     syscall_table[SYS_NR_GETPID] = sys_getpid;
     syscall_table[SYS_NR_GETPPID] = sys_getppid;

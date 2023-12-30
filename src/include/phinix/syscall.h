@@ -18,6 +18,7 @@ typedef enum syscall_t
     SYS_NR_CREAT = 8,
     SYS_NR_LINK = 9,
     SYS_NR_UNLINK = 10,
+    SYS_NR_EXECVE = 11,
     SYS_NR_CHDIR = 12,
     SYS_NR_TIME = 13,
     SYS_NR_MKNOD = 14,
@@ -65,6 +66,9 @@ pid_t fork();
 // 退出进程
 void exit(int status);
 pid_t waitpid(pid_t pid, int32 *status);
+
+// 执行程序
+int execve(char *filename, char *argv[], char *envp[]);
 
 void yield();
 void sleep(u32 ms);
