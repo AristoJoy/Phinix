@@ -314,7 +314,7 @@ void task_to_user_mode(target_t target)
     // 创建用户进程虚拟内存位图
     task->vmap = kmalloc(sizeof(bitmap_t));
     void *buf = (void *)alloc_kpage(1); // 只能表示128M的空间
-    bitmap_init(task->vmap, buf, PAGE_SIZE, KERNEL_MEMORY_SIZE / PAGE_SIZE);
+    bitmap_init(task->vmap, buf, USER_MMAP_SIZE / PAGE_SIZE / 8, USER_MMAP_ADDR / PAGE_SIZE);
 
     // 创建用户进程页表(进入用户态，需要创建用户进程单独的页目录)
     task->pde = (u32)copy_pde();
