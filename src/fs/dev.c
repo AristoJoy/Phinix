@@ -5,6 +5,8 @@
 #include <phinix/assert.h>
 #include <phinix/fs.h>
 
+extern file_t file_table[];
+
 void dev_init()
 {
     mkdir("/dev", 0755);
@@ -50,7 +52,8 @@ void dev_init()
         mknod(name, IFBLK | 0600, device->dev);
     }
     
-    for (size_t i = 0; true; i++)
+    // 防止误操作，去掉mda，保护dev文件系统
+    for (size_t i = 1; true; i++)
     {
         device = device_find(DEV_RAMDISK, i);
         if (!device)
@@ -61,4 +64,30 @@ void dev_init()
         mknod(name, IFBLK | 0600, device->dev);
     }
     
+    link("/dev/console", "/dev/stdout");
+    link("/dev/console", "/dev/stderr");
+    link("/dev/keyboard", "/dev/stdin");
+
+    file_t *file;
+    inode_t *inode;
+    file = &file_table[STDIN_FILENO];
+    inode = namei("/dev/stdin");
+    file->inode = inode;
+    file->mode = inode->desc->mode;
+    file->flags = O_RDONLY;
+    file->offset  = 0;
+
+    file = &file_table[STDOUT_FILENO];
+    inode = namei("/dev/stdout");
+    file->inode = inode;
+    file->mode = inode->desc->mode;
+    file->flags = O_WRONLY;
+    file->offset = 0;
+
+    file = &file_table[STDERR_FILENO];
+    inode = namei("/dev/stderr");
+    file->inode = inode;
+    file->mode = inode->desc->mode;
+    file->flags = O_WRONLY;
+    file->offset = 0;
 }

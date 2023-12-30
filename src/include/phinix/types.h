@@ -51,9 +51,9 @@ typedef int32 fd_t;
 // 标准文件描述符
 typedef enum std_fd_t
 {
-    stdin,
-    stdout,
-    stderr,
+    STDIN_FILENO,
+    STDOUT_FILENO,
+    STDERR_FILENO,
 } std_fd_t;
 
 typedef int32 off_t; // 文件偏移

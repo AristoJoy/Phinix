@@ -20,6 +20,7 @@ extern u32 volatile jiffies;
 extern u32 jiffy;
 extern bitmap_t kernel_map;
 extern tss_t tss;
+extern file_t file_table[];
 
 extern void task_switch(task_t *next);
 
@@ -76,7 +77,6 @@ fd_t task_get_fd(task_t *task)
         panic("Exceed task max open files.");
     }
     return i;
-    
 }
 
 // 释放任务的文件描述符
@@ -292,7 +292,14 @@ static task_t *task_create(target_t target, const char *name, u32 priority, u32 
     task->pwd = (void *)alloc_kpage(1);
     strcpy(task->pwd, "/");
 
-    task->umask = 0022 ; // 对应0755
+    task->umask = 0022; // 对应0755
+
+    task->files[STDIN_FILENO] = &file_table[STDIN_FILENO];
+    task->files[STDOUT_FILENO] = &file_table[STDOUT_FILENO];
+    task->files[STDERR_FILENO] = &file_table[STDERR_FILENO];
+    task->files[STDIN_FILENO]->count++;
+    task->files[STDOUT_FILENO]->count++;
+    task->files[STDERR_FILENO]->count++;
 
     task->magic = PHINIX_MAGIC;
 
@@ -416,9 +423,7 @@ pid_t task_fork()
         {
             file->count++;
         }
-        
     }
-    
 
     // 构造child内核栈
     task_build_stack(child); // ROP
@@ -453,7 +458,6 @@ void task_exit(int status)
             close(i);
         }
     }
-    
 
     // 将子进程的父进程赋值为自己的父进程
     for (size_t i = 2; i < NR_TASK; i++)
