@@ -311,7 +311,7 @@ static int devmkfs(dev_t dev, int icount)
     desc->first_datazone = 2 + desc->imap_blocks + desc->zmap_blocks +  inode_blocks;
     desc->log_zone_size = 0;
     desc->max_size = BLOCK_SIZE * TOTAL_BLOCK;
-    desc->magic = PHINIX_MAGIC;
+    desc->magic = MINIX1_MAGIC;
 
     // 清空位图
     memset(sb->imaps, 0, sizeof(sb->imaps));
@@ -412,7 +412,6 @@ static int devmkfs(dev_t dev, int icount)
 
 rollback:
     put_super(sb);
-    brelse(buf);
     return ret;
 }
 

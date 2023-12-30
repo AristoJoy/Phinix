@@ -87,7 +87,7 @@ idx_t ialloc(dev_t dev)
         assert(buf);
 
         // 将整个缓冲区作为位图
-        bitmap_make(&map, buf->data, BLOCK_SIZE, i * BLOCK_BITS);
+        bitmap_make(&map, buf->data, BLOCK_BITS, i * BLOCK_BITS);
 
         // 从位图中扫描一位
         bit = bitmap_scan(&map, 1);
