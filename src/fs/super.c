@@ -270,7 +270,7 @@ rollback:
 }
 
 // 创建设备文件系统
-static int devmkfs(dev_t dev, int icount)
+int devmkfs(dev_t dev, int icount)
 {
     super_block_t *sb = NULL;
     buffer_t *buf = NULL;
