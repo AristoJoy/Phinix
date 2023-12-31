@@ -11,6 +11,7 @@ CFLAGS+= -fno-pic     # 不需要位置无关的代码 position independent code
 CFLAGS+= -fno-pie     # 不需要位置无关的可执行程序 position independent executable
 CFLAGS+= -nostdlib   # 不需要 gcc 标准库
 CFLAGS+= -fno-stack-protector   # 不需要栈保护
+CFLAGS+= -DPHINIX # 定义PHINIX
 CFLAGS:=$(strip ${CFLAGS})
 
 DEBUG:= -g
@@ -29,7 +30,20 @@ $(BUILD)/%.o: $(SRC)/%.c
 	$(shell mkdir -p $(dir $@))
 	gcc $(CFLAGS) $(DEBUG) $(INCLUDE) -c $< -o $@
 
-$(BUILD)/builtin/%.out: $(BUILD)/builtin/%.o
+$(BUILD)/lib/libc.o: $(BUILD)/lib/crt.o \
+	$(BUILD)/lib/crt1.o \
+	$(BUILD)/lib/string.o \
+	$(BUILD)/lib/vsprintf.o \
+	$(BUILD)/lib/stdlib.o \
+	$(BUILD)/lib/syscall.o \
+	$(BUILD)/lib/printf.o \
+	$(BUILD)/lib/assert.o \
+
+	ld -m elf_i386 -r $^ -o $@
+
+$(BUILD)/builtin/%.out: $(BUILD)/builtin/%.o \
+	$(BUILD)/lib/libc.o \
+	
 	ld -m elf_i386 -static $^ -o $@ -Ttext 0x1001000
 
 LDFLAGS:= -m elf_i386 \
