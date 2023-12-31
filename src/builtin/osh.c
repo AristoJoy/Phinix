@@ -314,6 +314,29 @@ void builtin_mkfs(int argc, char *argv[])
     mkfs(argv[1], 0);
 }
 
+// 执行程序
+void builtin_exec(int argc, char *argv[])
+{
+    if (argc < 2)
+    {
+        return;
+    }
+    int status;
+    pid_t pid = fork();
+    if (pid)
+    {
+        pid_t child = waitpid(pid, &status);
+        printf("wait pid %d status %d %d\n", child, status, time());
+    }
+    else
+    {
+        // execve 除非文件不合法，否则不会返回
+        int i = execve(argv[1], NULL, NULL);
+        exit(i);
+    }
+    
+}
+
 // 执行命令
 static void execute(int argc, char *argv[])
 {
@@ -382,6 +405,10 @@ static void execute(int argc, char *argv[])
     if (!strcmp(line, "mkfs"))
     {
         return builtin_mkfs(argc, argv);
+    }
+    if (!strcmp(line, "exec"))
+    {
+        return builtin_exec(argc, argv);
     }
     printf("osh : command not found: %s\n", argv[0]);
 }
@@ -464,8 +491,6 @@ static int cmd_parse(char *cmd, char *argv[], char token)
 
 int osh_main()
 {
-    execve("/hello.out", NULL, NULL);
-
     memset(cmd, 0, sizeof(cmd));
     memset(cwd, 0, sizeof(cwd));
 

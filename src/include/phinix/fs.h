@@ -169,4 +169,11 @@ void put_file(file_t *file);
 // 格式化文件系统
 int devmkfs(dev_t dev, int icount);
 
+#define P_EXEC IXOTH
+#define P_READ IROTH
+#define P_WRITE IWOTH
+
+// 判断是否有权限
+bool permission(inode_t *inode, u16 mask);
+
 #endif

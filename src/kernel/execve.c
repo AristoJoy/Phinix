@@ -3,8 +3,10 @@
 #include <phinix/fs.h>
 #include <phinix/memory.h>
 #include <phinix/string.h>
+#include <phinix/stdlib.h>
 #include <phinix/assert.h>
 #include <phinix/debug.h>
+#include <phinix/task.h>
 
 #if 0
 #define < elf.h>
@@ -61,14 +63,14 @@ enum Etype
 // ELF 机器(CPU)类型
 enum EMachine
 {
-    EM_NONE = 0, // No machine
-    EM_M32 = 1, // AT&T WE 32100
+    EM_NONE = 0,  // No machine
+    EM_M32 = 1,   // AT&T WE 32100
     EM_SPARC = 2, // SPARC
-    EM_386 = 3, // Intel 80386
-    EM_68K = 4, // Motorola 68000
-    EM_88K = 5, // Motorola 88000
-    EM_860 = 7, // Intel 80860
-    EM_MIPS = 8, // MIPS RS3000
+    EM_386 = 3,   // Intel 80386
+    EM_68K = 4,   // Motorola 68000
+    EM_88K = 5,   // Motorola 88000
+    EM_860 = 7,   // Intel 80860
+    EM_MIPS = 8,  // MIPS RS3000
 };
 
 // ELF 文件版本
@@ -168,7 +170,7 @@ typedef struct Elf32_Sym
 #define ELF32_ST_BIND(i) ((i) >> 4)
 
 // 通过info获取类型
-#define ELF32_ST_TYPE(i) ((i) & 0xF) 
+#define ELF32_ST_TYPE(i) ((i) & 0xF)
 
 // 通过约束b和类型t获取info
 #define ELF32_ST_INFO(b, t) (((b) << 4) + ((t) & 0xf))
@@ -196,135 +198,179 @@ enum SymbolType
     STT_HIPROC = 15, // 处理器相关
 };
 
-// 执行程序
-int sys_execve(char *filename, char *argv[], char *envp[])
+// 检查ELF文件头
+static bool elf_validate(Elf32_Ehdr *ehdr)
 {
-    fd_t fd = open(filename, O_RDONLY, 0);
-    if (fd == EOF)
+    // 不是ELF文件
+    if (memcmp(&ehdr->e_ident, "\177ELF\1\1\1", 7))
+    {
+        return false;
+    }
+    // 是不可执行文件
+    if (ehdr->e_type != ET_EXEC)
+    {
+        return false;
+    }
+    // 不是386程序
+    if (ehdr->e_machine != EM_386)
+    {
+        return false;
+    }
+    // 版本不可识别
+    if (ehdr->e_version != EV_CURRENT)
+    {
+        return false;
+    }
+
+    // 程序头大小不相等
+    if (ehdr->e_phentsize != sizeof(Elf32_Phdr))
+    {
+        return false;
+    }
+    return true;
+}
+
+// 加载段
+static void load_segment(inode_t *inode, Elf32_Phdr *phdr)
+{
+    assert(phdr->p_align == 0x1000);
+    assert((phdr->p_vaddr & 0xfff) == 0);
+
+    u32 vaddr = phdr->p_vaddr;
+
+    // 需要的页数
+    u32 count = div_round_up(MAX(phdr->p_memsz, phdr->p_filesz), PAGE_SIZE);
+
+    for (size_t i = 0; i < count; i++)
+    {
+        u32 addr = vaddr + i * PAGE_SIZE;
+        assert(addr >= USER_EXEC_ADDR && addr < USER_MMAP_ADDR);
+        link_page(addr);
+    }
+
+    inode_read(inode, (char *)vaddr, phdr->p_filesz, phdr->p_offset);
+
+    // 填充尾部
+    if (phdr->p_filesz < phdr->p_memsz)
+    {
+        memset((char *)vaddr + phdr->p_filesz, 0, phdr->p_memsz - phdr->p_filesz);
+    }
+
+    // 如果段不可写，则置为只读
+    if ((phdr->p_flags & PF_W) == 0)
+    {
+        for (size_t i = 0; i < count; i++)
+        {
+            u32 addr = vaddr + i * PAGE_SIZE;
+            page_entry_t *entry = get_entry(addr, false);
+            entry->write = false;
+            entry->readonly = true;
+            flush_tlb(addr);
+        }
+    }
+
+    task_t *task = running_task();
+    if (phdr->p_flags == (PF_R | PF_X))
+    {
+        task->text = vaddr;
+    }
+    else if (phdr->p_flags == (PF_R | PF_W))
+    {
+        task->data = vaddr;
+    }
+
+    task->end = MAX(task->end, (vaddr + count * PAGE_SIZE));
+}
+
+// 加载elf格式可执行程序
+static u32 load_elf(inode_t *inode)
+{
+    link_page(USER_EXEC_ADDR);
+
+    int n = 0;
+    // 读取elf文件头
+    n = inode_read(inode, (char *)USER_EXEC_ADDR, sizeof(Elf32_Ehdr), 0);
+    assert(n == sizeof(Elf32_Ehdr));
+
+    Elf32_Ehdr *ehdr = (Elf32_Ehdr *)USER_EXEC_ADDR;
+    if (!elf_validate(ehdr))
     {
         return EOF;
     }
-    
-    // ELF文件头
-    Elf32_Ehdr *ehdr = (Elf32_Ehdr *)alloc_kpage(1);
-    lseek(fd, 0, SEEK_SET);
-    read(fd, (char *)ehdr, sizeof(Elf32_Ehdr));
 
-    LOGK("ELF ident %s\n", ehdr->e_ident.ei_magic);
-    LOGK("ELF class %d\n", ehdr->e_ident.ei_class);
-    LOGK("ELF data %d\n", ehdr->e_ident.ei_data);
-    LOGK("ELF type %d\n", ehdr->e_type);
-    LOGK("ELF machine %d\n", ehdr->e_machine);
-    LOGK("ELF entry 0x%p\n", ehdr->e_entry);
-    LOGK("ELF ehsize %d %d\n", ehdr->e_ehsize, sizeof(Elf32_Ehdr));
-    LOGK("ELF phoff %d\n", ehdr->e_phoff);
-    LOGK("ELF phnum %d\n", ehdr->e_phnum);
-    LOGK("ELF phsize %d %d\n", ehdr->e_phentsize, sizeof(Elf32_Phdr));
-    LOGK("ELF shoff %d\n", ehdr->e_shoff);
-    LOGK("ELF shnum %d\n", ehdr->e_shnum);
-    LOGK("ELF shsize %d %d\n", ehdr->e_shentsize, sizeof(Elf32_Shdr));
-
-    // 段头
-    Elf32_Phdr *phdr = (Elf32_Phdr *)alloc_kpage(1);
-    lseek(fd, ehdr->e_phoff, SEEK_SET);
-    read(fd, (char *)phdr, ehdr->e_phentsize * ehdr->e_phnum);
-    LOGK("ELF segment size mem %d\n", ehdr->e_phentsize * ehdr->e_phnum);
+    // 读取程序段头
+    Elf32_Phdr *phdr = (Elf32_Phdr *)(USER_EXEC_ADDR + sizeof(Elf32_Ehdr));
+    n = inode_read(inode, (char *)phdr, ehdr->e_phnum * ehdr->e_phentsize, ehdr->e_phoff);
 
     Elf32_Phdr *ptr = phdr;
-    // 内容
-    char *content = (char *)alloc_kpage(1);
     for (size_t i = 0; i < ehdr->e_phnum; i++)
     {
-        memset(content, 0, PAGE_SIZE);
-        lseek(fd, ptr->p_offset, SEEK_SET);
-        read(fd, content, ptr->p_filesz);
-
-        LOGK("segment vaddr 0x%p paddr 0x%p\n", ptr->p_vaddr, ptr->p_paddr);
+        if (ptr->p_type != PT_LOAD)
+        {
+            continue;
+        }
+        load_segment(inode, ptr);
         ptr++;
     }
 
-    // 节头
-    Elf32_Shdr *shdr = (Elf32_Shdr *)alloc_kpage(1);
-    lseek(fd, ehdr->e_shoff, SEEK_SET);
-    read(fd, (char *)shdr, ehdr->e_shentsize * ehdr->e_shnum);
-    LOGK("ELF section size mem %d\n", ehdr->e_shentsize * ehdr->e_shnum);
+    return ehdr->e_entry;
+}
 
-    // 节字符串表
-    char *shstrtab = (char *)alloc_kpage(1);
-    Elf32_Shdr *sptr = &shdr[ehdr->e_shstrndx];
-    assert(sptr->sh_type == SHT_STRTAB);
-    assert(sptr->sh_size > 0);
+extern int sys_brk();
 
-    lseek(fd, sptr->sh_offset, SEEK_SET);
-    read(fd, (char *)shstrtab, sptr->sh_size);
-    char *name = shstrtab + 1;
-    while (*name)
+// 执行程序
+int sys_execve(char *filename, char *argv[], char *envp[])
+{
+    inode_t *inode = namei(filename);
+    int ret = EOF;
+    if (!inode)
     {
-        LOGK("section name %s\n", name);
-        name += strlen(name) + 1;
+        goto rollback;
     }
-    
-    char *strtab = (char *)alloc_kpage(1);
-
-    sptr = shdr;
-    int strtab_idx = 0;
-    int symtab_idx = 0;
-
-    for (size_t i = 0; i < ehdr->e_shnum; i++)
+    // 不是常规文件
+    if (!ISFILE(inode->desc->mode))
     {
-        char *sname = &shstrtab[sptr->sh_name];
-        LOGK("section %s size %d vaddr 0x%p\n", sname, sptr->sh_size, sptr->sh_addr);
-
-        if (!strcmp(sname, ".strtab"))
-        {
-            strtab_idx = i;
-        }
-        else if (!strcmp(sname, ".symtab"))
-        {
-            symtab_idx = i;
-        }
-        sptr++;
+        goto rollback;
     }
 
-    // 程序字符串表
-    sptr = &shdr[strtab_idx];
-    assert(sptr->sh_size > 0);
-    lseek(fd, sptr->sh_offset, SEEK_SET);
-    read(fd, strtab, sptr->sh_size);
-    name = strtab + 1;
-    while (*name)
+    // 文件不可执行
+    if (!permission(inode, P_EXEC))
     {
-        LOGK("symbol name %s\n", name);
-        name += strlen(name) + 1;
-    }
-    
-    // 符号表
-    Elf32_Sym *symtab = (Elf32_Sym *)alloc_kpage(1);
-    sptr = &shdr[symtab_idx];
-    assert(sptr->sh_size > 0);
-    lseek(fd, sptr->sh_offset, SEEK_SET);
-    read(fd, (char *)symtab, sptr->sh_size);
-
-    Elf32_Sym *symptr = symtab;
-    int encount = sptr->sh_size / sptr->sh_entsize;
-    for (size_t i = 0; i < encount; i++)
-    {
-        LOGK("v: 0x%X size: %d sec: %d b: %d t: %d n: %s\n",
-            symptr->st_value,
-            symptr->st_size,
-            symptr->st_shndx,
-            ELF32_ST_BIND(symptr->st_info),
-            ELF32_ST_TYPE(symptr->st_info),
-            &strtab[symptr->st_name]);
-        symptr++;
+        goto rollback;
     }
 
-    free_kpage((u32)ehdr, 1);
-    free_kpage((u32)phdr, 1);
-    free_kpage((u32)shdr, 1);
-    free_kpage((u32)content, 1);
-    free_kpage((u32)strtab, 1);
-    free_kpage((u32)symtab, 1);
-    free_kpage((u32)shstrtab, 1);
-    return 0;
+    task_t *task = running_task();
+    strncpy(task->name, filename, TASK_NAME_LEN);
+    // todo 处理参数和环境变量
+
+    // 首先释放源程序的堆内存
+    task->end = USER_EXEC_ADDR;
+    sys_brk(USER_EXEC_ADDR);
+
+    // 加载程序
+    u32 entry = load_elf(inode);
+    if (entry == EOF)
+    {
+        goto rollback;
+    }
+
+    // 设置对内存地址
+    sys_brk((u32)task->end);
+
+    iput(task->iexec);
+    task->iexec = inode;
+
+    intr_frame_t *iframe = (intr_frame_t *)((u32)task + PAGE_SIZE - sizeof(intr_frame_t));
+
+    iframe->eip = entry;
+    iframe->esp = (u32)USER_STACK_TOP;
+
+    // ROP技术，直接从中断返回
+    asm volatile(
+        "movl %0, %%esp\n"
+        "jmp interrupt_exit\n" ::"m"(iframe));
+
+rollback:
+    iput(inode);
+    return ret;
 }
