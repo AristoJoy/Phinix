@@ -474,6 +474,13 @@ static u32 ide_identify(ide_disk_t *disk, u16 *buf)
         goto rollback;
     }
 
+    // 简单兼容VMware，目前没有找到好的办法
+    if (params->total_lba > (1 << 28))
+    {
+        params->total_lba = 0;
+        goto rollback;
+    }
+
     ide_swap_pairs(params->serial, sizeof(params->serial));
     LOGK("disk %s serial number %s\n", disk->name, params->serial);
 
