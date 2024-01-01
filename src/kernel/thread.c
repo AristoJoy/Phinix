@@ -26,9 +26,6 @@ void idle_thread()
     }
     
 }
-
-extern void osh_main();
-
 static void user_init_thread()
 {
 
@@ -44,7 +41,9 @@ static void user_init_thread()
         }
         else
         {
-            osh_main();
+            int err = execve("/bin/osh.out", NULL, NULL);
+            printf("execve /bin/osh.out error %d\n", err);
+            exit(err);
         }
 
     }
