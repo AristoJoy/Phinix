@@ -9,6 +9,7 @@
 #include <phinix/task.h>
 #include <phinix/syscall.h>
 #include <phinix/fs.h>
+#include <phinix/printk.h>
 
 #define LOGK(fmt, args...) DEBUGK(fmt, ##args)
 
@@ -259,6 +260,7 @@ void mapping_init()
         // 设置页目录项
         page_entry_t *dentry = &pde[didx];
         entry_init(dentry, IDX((u32)pte));
+        dentry->user = 0; // 只能被内核访问
 
         for (size_t tidx = 0; tidx < 1024; tidx++, index++)
         {
@@ -270,6 +272,7 @@ void mapping_init()
 
             page_entry_t *tentry = &pte[tidx];
             entry_init(tentry, index);
+            tentry->user = 0; // 只能被内核访问
             memory_map[index] = 1; //  设置物理内存数组，该页被占用
         }
     }
@@ -608,7 +611,16 @@ void page_fault(
     // 获取当前执行的任务
     task_t *task = running_task();
 
-    assert(KERNEL_MEMORY_SIZE <= vaddr && vaddr < USER_STACK_TOP);
+    // assert(KERNEL_MEMORY_SIZE <= vaddr && vaddr < USER_STACK_TOP);
+    
+    // 如果用户程序访问了不该访问的内存
+    if (vaddr < USER_EXEC_ADDR || vaddr >= USER_STACK_TOP)
+    {
+        assert(task->uid);
+        printk("Segmentation Fault!!!\n");
+        task_exit(-1);
+    }
+    
 
     // 用户只读内存(写时复制)
     if (code->present)
