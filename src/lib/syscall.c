@@ -149,6 +149,12 @@ fd_t dup2(fd_t oldfd, fd_t newfd)
     return _syscall2(SYS_NR_DUP2, oldfd, newfd);
 }
 
+// 创建管道
+int pipe(fd_t pipefd[2])
+{
+    return _syscall1(SYS_NR_PIPE, (u32)pipefd);
+}
+
 // 打开文件
 fd_t open(char *filename, int flags, int mode)
 {

@@ -71,10 +71,33 @@ void builtin_logo()
 void builtin_test(int argc, char *argv[])
 {
     printf("osh test starting...\n");
-    // while (true)
-    // {
-    //     test();
-    // }
+
+    int status = 0;
+    fd_t pipefd[2];
+
+    int result = pipe(pipefd);
+
+    pid_t pid = fork();
+    if (pid)
+    {
+        char buf[128];
+        printf("--%d-- getting message\n", getpid());
+        int len = read(pipefd[0], buf, 24);
+        printf("--%d-- get message: %s count %d\n", getpid(), buf, len);
+
+        pid_t child = waitpid(pid, &status);
+        close(pipefd[0]);
+        close(pipefd[1]);
+    }
+    else
+    {
+        char *message = "pipe written message!!!";
+        printf("--%d-- put message: %s\n", getpid(), message);
+        write(pipefd[1], message, 24);
+        close(pipefd[0]);
+        close(pipefd[1]);
+        exit(0);
+    }
 }
 
 void builtin_pwd()
@@ -167,7 +190,6 @@ void builtin_mkfs(int argc, char *argv[])
     }
     mkfs(argv[1], 0);
 }
-
 
 static void dupfile(int argc, char **argv, fd_t dupfd[3])
 {
@@ -263,10 +285,7 @@ rollback:
         {
             close(dupfd[i]);
         }
-        
     }
-    
-    
 }
 
 pid_t builtin_command(char *filename, char *argv[], fd_t infd, fd_t outfd, fd_t errfd)
@@ -319,7 +338,7 @@ void builtin_exec(int argc, char *argv[])
         printf("osh : command not found: %s \n", argv[0]);
         return;
     }
-    
+
     int status;
     fd_t dupfd[3];
 

@@ -60,15 +60,18 @@ typedef struct inode_desc_t
 // inode 内存
 typedef struct inode_t
 {
-    inode_desc_t *desc;   // inode 描述符
-    struct buffer_t *buf; // inode描述符对应 buffer
-    dev_t dev;            // 设备号
-    idx_t nr;             // i节点号
-    u32 count;            // 引用计数
-    time_t atime;         // 访问时间
-    time_t ctime;         // 修改时间
-    list_node_t node;     // 链表结点
-    dev_t mount;          // 安装设备
+    inode_desc_t *desc;      // inode 描述符
+    struct buffer_t *buf;    // inode描述符对应 buffer
+    dev_t dev;               // 设备号
+    idx_t nr;                // i节点号
+    u32 count;               // 引用计数
+    time_t atime;            // 访问时间
+    time_t ctime;            // 修改时间
+    list_node_t node;        // 链表结点
+    dev_t mount;             // 安装设备
+    struct task_t *rxwaiter; // 读等待进程
+    struct task_t *txwaiter; // 写等待进程
+    bool pipe;               // 管道标志
 } inode_t;
 
 // 超级快
@@ -177,5 +180,14 @@ int devmkfs(dev_t dev, int icount);
 
 // 判断是否有权限
 bool permission(inode_t *inode, u16 mask);
+
+// 获取管道inode
+inode_t *get_pipe_inode();
+
+// 管道读
+int pipe_read(inode_t *inode, char *buf, int count);
+
+// 管道写
+int pipe_write(inode_t *inode, char *buf, int count);
 
 #endif

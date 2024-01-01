@@ -111,7 +111,12 @@ int sys_read(fd_t fd, char *buf, int len)
 
     inode_t *inode = file->inode;
     int count = 0;
-    if (ISCHR(inode->desc->mode))
+    if (inode->pipe)
+    {
+        count = pipe_read(inode, buf, len);
+        return count;
+    }
+    else if (ISCHR(inode->desc->mode))
     {
         assert(inode->desc->zone[0]);
         count = device_read(inode->desc->zone[0], buf, len, 0, 0);
@@ -154,8 +159,12 @@ int sys_write(fd_t fd, char *buf, u32 len)
     inode_t *inode = file->inode;
     assert(inode);
     int count = 0;
-
-    if (ISCHR(inode->desc->mode))
+    if (inode->pipe)
+    {
+        count = pipe_write(inode, buf, len);
+        return count;
+    }
+    else if (ISCHR(inode->desc->mode))
     {
         assert(inode->desc->zone[0]);
         device_t *device = device_get(inode->desc->zone[0]);
