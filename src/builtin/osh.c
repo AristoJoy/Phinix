@@ -14,16 +14,22 @@
 
 static char cwd[MAX_PATH_LEN];
 static char cmd[MAX_CMD_LEN];
-static char *argv[MAX_ARG_NR];
+static char *args[MAX_ARG_NR];
 static char buf[BUFLEN];
 
+static char *envp[] = {
+    "HOME=/",
+    "PATH=/bin",
+    NULL,
+};
+
 static char phinix_logo[][52] = {
-    "           __________.__    .__       .__        \n\t",
-    "           \\______   \\  |__ |__| ____ |__|__  ___\n\t",
-    "            |     ___/  |  \\|  |/    \\|  \\  \\/  /\n\t",
-    "            |    |   |   Y  \\  |   |  \\  |>    < \n\t",
-    "            |____|   |___|  /__|___|  /__/__/\\_ \\\n\t",
-    "                          \\/        \\/         \\/\n\t",
+    "           __________.__    .__       .__        \n\0",
+    "           \\______   \\  |__ |__| ____ |__|__  ___\n\0",
+    "            |     ___/  |  \\|  |/    \\|  \\  \\/  /\n\0",
+    "            |    |   |   Y  \\  |   |  \\  |>    < \n\0",
+    "            |____|   |___|  /__|___|  /__/__/\\_ \\\n\0",
+    "                          \\/        \\/         \\/\n\0",
 };
 
 extern char *strsep(const char *str);
@@ -69,7 +75,6 @@ void builtin_test(int argc, char *argv[])
     // {
     //     test();
     // }
-    
 }
 
 void builtin_pwd()
@@ -298,26 +303,19 @@ void builtin_mkfs(int argc, char *argv[])
 }
 
 // 执行程序
-void builtin_exec(int argc, char *argv[])
+void builtin_exec(char *filename, int argc, char *argv[])
 {
-    if (argc < 2)
-    {
-        return;
-    }
     int status;
     pid_t pid = fork();
     if (pid)
     {
         pid_t child = waitpid(pid, &status);
-        printf("wait pid %d status %d %d\n", child, status, time());
+        // printf("wait pid %d status %d %d\n", child, status, time());
+        return;
     }
-    else
-    {
-        // execve 除非文件不合法，否则不会返回
-        int i = execve(argv[1], NULL, NULL);
-        exit(i);
-    }
-    
+    // execve 除非文件不合法，否则不会返回
+    int i = execve(filename, argv, envp);
+    exit(i);
 }
 
 // 执行命令
@@ -389,11 +387,16 @@ static void execute(int argc, char *argv[])
     {
         return builtin_mkfs(argc, argv);
     }
-    if (!strcmp(line, "exec"))
+
+    stat_t stat_buf;
+    sprintf(buf, "/bin/%s.out", argv[0]);
+    if (stat(buf, &stat_buf) == EOF)
     {
-        return builtin_exec(argc, argv);
+        printf("osh: command not found : %s\n", argv[0]);
+        return;
     }
-    printf("osh : command not found: %s\n", argv[0]);
+
+    return builtin_exec(buf, argc - 1, &argv[1]);
 }
 
 // 读取一行
@@ -476,7 +479,6 @@ int osh_main()
 {
     // builtin_test(0, NULL);
 
-    
     memset(cmd, 0, sizeof(cmd));
     memset(cwd, 0, sizeof(cwd));
 
@@ -490,12 +492,12 @@ int osh_main()
         {
             continue;
         }
-        int argc = cmd_parse(cmd, argv, ' ');
+        int argc = cmd_parse(cmd, args, ' ');
         if (argc < 0 || argc >= MAX_ARG_NR)
         {
             continue;
         }
-        execute(argc, argv);
+        execute(argc, args);
     }
     return 0;
 }
