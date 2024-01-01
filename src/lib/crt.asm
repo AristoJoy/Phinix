@@ -13,7 +13,7 @@ _start:
     pop esi; 栈顶参数为argc
     mov ecx, esp ; 其次为argv
 
-    and esp, -16 ; 栈对齐，SSE需要16字节对齐
+    and esp, -16 ; 栈对齐,SSE需要16字节对齐
     push eax; 没什么用
     push esp; 用户程序栈最大地址
     push edx; 动态链接器
