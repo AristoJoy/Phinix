@@ -306,8 +306,10 @@ static task_t *task_create(target_t target, const char *name, u32 priority, u32 
     return task;
 }
 
+extern int sys_execve();
+
 // 切换回用户模式
-void task_to_user_mode(target_t target)
+void task_to_user_mode()
 {
     task_t *task = running_task();
 
@@ -344,15 +346,14 @@ void task_to_user_mode(target_t target)
 
     iframe->error = PHINIX_MAGIC;
 
-    iframe->eip = (u32)target;
+    iframe->eip = 0;
     iframe->eflags = (0 << 12 | 0b10 | 1 << 9); // IOPL 为0 IF 为1
 
     // 用户栈顶
     iframe->esp = USER_STACK_TOP;
 
-    asm volatile(
-        "movl %0, %%esp\n"
-        "jmp interrupt_exit\n" ::"m"(iframe));
+    int err = sys_execve("/bin/init.out", NULL, NULL);
+    panic("exec /bin/init.out failure");
 }
 
 extern void interrupt_exit();
@@ -564,5 +565,5 @@ void task_init()
     task_setup();
     idle_task = task_create(idle_thread, "idle", 1, KERNEL_USER);
     task_create(init_thread, "init", 5, NORMAL_USER);
-    task_create(test_thread, "test", 5, KERNEL_USER);
+    task_create(test_thread, "test", 5, NORMAL_USER);
 }

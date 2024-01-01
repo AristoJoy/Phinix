@@ -114,7 +114,7 @@ void task_sleep(u32 ms);
 void task_wakeup();
 
 // 切换回用户模式
-void task_to_user_mode(target_t target);
+void task_to_user_mode();
 
 // 获取任务id
 pid_t sys_getpid();
