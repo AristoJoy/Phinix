@@ -191,7 +191,7 @@ void builtin_mkfs(int argc, char *argv[])
     mkfs(argv[1], 0);
 }
 
-static void dupfile(int argc, char **argv, fd_t dupfd[3])
+static int dupfile(int argc, char **argv, fd_t dupfd[3])
 {
     for (size_t i = 0; i < 3; i++)
     {
@@ -276,7 +276,7 @@ static void dupfile(int argc, char **argv, fd_t dupfd[3])
         }
         dupfd[2] = fd;
     }
-    return;
+    return 0;
 
 rollback:
     for (size_t i = 0; i < 3; i++)
@@ -286,6 +286,7 @@ rollback:
             close(dupfd[i]);
         }
     }
+    return EOF;
 }
 
 pid_t builtin_command(char *filename, char *argv[], fd_t infd, fd_t outfd, fd_t errfd)
@@ -331,21 +332,66 @@ pid_t builtin_command(char *filename, char *argv[], fd_t infd, fd_t outfd, fd_t 
 // 执行程序
 void builtin_exec(int argc, char *argv[])
 {
-    stat_t statbuf;
-    sprintf(buf, "/bin/%s.out", argv[0]);
-    if (stat(buf, &statbuf) == EOF)
-    {
-        printf("osh : command not found: %s \n", argv[0]);
-        return;
-    }
+    bool p = true;
 
     int status;
+
+    char **bargv = NULL;
+    char *name = buf;
     fd_t dupfd[3];
+    if (dupfile(argc, argv, dupfd) == EOF)
+    {
+        return;
+    }
+    
+    fd_t infd = dupfd[0];
+    fd_t pipefd[2];
+    int count = 0;
+    for (size_t i = 0; i < argc; i++)
+    {
+        if (!argv[i])
+        {
+            continue;
+        }
+        
+        if (!p && !strcmp(argv[i], "|"))
+        {
+            argv[i] = NULL;
+            int ret = pipe(pipefd);
+            builtin_command(name, bargv, infd, pipefd[1], EOF);
+            count++;
+            infd = pipefd[0];
+            int len = strlen(name) + 1;
+            name += len;
+            p = true;
+            continue;
+        }
 
-    dupfile(argc, argv, dupfd);
+        if(!p)
+        {
+            continue;
+        }
 
-    pid_t pid = builtin_command(buf, &argv[1], dupfd[0], dupfd[1], dupfd[2]);
-    waitpid(pid, &status);
+        stat_t statbuf;
+        sprintf(name, "/bin/%s.out", argv[i]);
+        if (stat(name, &statbuf) == EOF)
+        {
+            printf("osh: command not found: %s\n", argv[i]);
+            return;
+        }
+        bargv = &argv[i + 1];
+        p = false;
+        
+    }
+
+    int pid = builtin_command(name, bargv, infd, dupfd[1], dupfd[2]);
+    for (size_t i = 0; i <= count; i++)
+    {
+        pid_t child = waitpid(-1, &status);
+        // printf("child %d exit\n", child);
+    }
+    
+    
 }
 
 // 执行命令
@@ -457,15 +503,16 @@ void readline(char *buf, u32 count)
 }
 
 // 解析命令
-static int cmd_parse(char *cmd, char *argv[], char token)
+static int cmd_parse(char *cmd, char *argv[])
 {
     assert(cmd != NULL);
 
     char *next = cmd;
     int argc = 0;
+    int quot = false;
     while (*next && argc < MAX_ARG_NR)
     {
-        while (*next == token)
+        while (*next == ' ' || (quot && *next != '"'))
         {
             next++;
         }
@@ -473,8 +520,26 @@ static int cmd_parse(char *cmd, char *argv[], char token)
         {
             break;
         }
+
+        if (*next == '"')
+        {
+            quot = !quot;
+            if (quot)
+            {
+                next++;
+                argv[argc++] = next;
+            }
+            else
+            {
+                *next = 0;
+                next++;
+            }
+            continue;
+        }
+        
+
         argv[argc++] = next;
-        while (*next && *next != token)
+        while (*next && *next != ' ')
         {
             next++;
         }
@@ -506,7 +571,7 @@ int osh_main()
         {
             continue;
         }
-        int argc = cmd_parse(cmd, args, ' ');
+        int argc = cmd_parse(cmd, args);
         if (argc < 0 || argc >= MAX_ARG_NR)
         {
             continue;
