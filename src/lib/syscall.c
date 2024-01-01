@@ -139,6 +139,16 @@ int munmap(void *addr, size_t length)
     return _syscall2(SYS_NR_MUNMAP, (u32)addr, (u32)length);
 }
 
+// 复制文件描述符
+fd_t dup(fd_t oldfd)
+{
+    return _syscall1(SYS_NR_DUP, oldfd);
+}
+fd_t dup2(fd_t oldfd, fd_t newfd)
+{
+    return _syscall2(SYS_NR_DUP2, oldfd, newfd);
+}
+
 // 打开文件
 fd_t open(char *filename, int flags, int mode)
 {

@@ -28,6 +28,8 @@
 #define SEPARATOR2 '\\'                                      // 目录分隔符2
 #define IS_SEPARATOR(c) (c == SEPARATOR1 || c == SEPARATOR2) // 字符释放为目录分隔符
 
+#define ACC_MODE(x) ("\004\002\006\377"[(x) & O_ACCMODE])
+
 // 文件标志
 enum file_flag
 {

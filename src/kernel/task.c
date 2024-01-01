@@ -82,10 +82,6 @@ fd_t task_get_fd(task_t *task)
 // 释放任务的文件描述符
 void task_put_fd(task_t *task, fd_t fd)
 {
-    if (fd < 3)
-    {
-        return;
-    }
     assert(fd < TASK_FILE_NR);
     task->files[fd] = NULL;
 }

@@ -168,20 +168,165 @@ void builtin_mkfs(int argc, char *argv[])
     mkfs(argv[1], 0);
 }
 
-// 执行程序
-void builtin_exec(char *filename, int argc, char *argv[])
+
+static void dupfile(int argc, char **argv, fd_t dupfd[3])
+{
+    for (size_t i = 0; i < 3; i++)
+    {
+        dupfd[i] = EOF;
+    }
+
+    int outappend = 0;
+    int errappend = 0;
+
+    char *infile = NULL;
+    char *outfile = NULL;
+    char *errfile = NULL;
+
+    for (size_t i = 0; i < argc; i++)
+    {
+        if (!strcmp(argv[i], "<") && (i + 1) < argc)
+        {
+            infile = argv[i + 1];
+            argv[i] = NULL;
+            i++;
+            continue;
+        }
+        if (!strcmp(argv[i], ">") && (i + 1) < argc)
+        {
+            outfile = argv[i + 1];
+            argv[i] = NULL;
+            i++;
+            continue;
+        }
+        if (!strcmp(argv[i], ">>") && (i + 1) < argc)
+        {
+            outfile = argv[i + 1];
+            argv[i] = NULL;
+            outappend = O_APPEND;
+            i++;
+            continue;
+        }
+        if (!strcmp(argv[i], "2>") && (i + 1) < argc)
+        {
+            errfile = argv[i + 1];
+            argv[i] = NULL;
+            i++;
+            continue;
+        }
+        if (!strcmp(argv[i], "2>>") && (i + 1) < argc)
+        {
+            errfile = argv[i + 1];
+            argv[i] = NULL;
+            errappend = O_APPEND;
+            i++;
+            continue;
+        }
+    }
+
+    if (infile != NULL)
+    {
+        fd_t fd = open(infile, O_RDONLY | outappend | O_CREAT, 0755);
+        if (fd == EOF)
+        {
+            printf("open file %s failure\n", infile);
+            goto rollback;
+        }
+        dupfd[0] = fd;
+    }
+    if (outfile != NULL)
+    {
+        fd_t fd = open(outfile, O_WRONLY | outappend | O_CREAT, 0755);
+        if (fd == EOF)
+        {
+            printf("open file %s failure\n", outfile);
+            goto rollback;
+        }
+        dupfd[1] = fd;
+    }
+    if (errfile != NULL)
+    {
+        fd_t fd = open(errfile, O_WRONLY | errappend | O_CREAT, 0755);
+        if (fd == EOF)
+        {
+            printf("open file %s failure\n", errfile);
+            goto rollback;
+        }
+        dupfd[2] = fd;
+    }
+    return;
+
+rollback:
+    for (size_t i = 0; i < 3; i++)
+    {
+        if (dupfd[i] != EOF)
+        {
+            close(dupfd[i]);
+        }
+        
+    }
+    
+    
+}
+
+pid_t builtin_command(char *filename, char *argv[], fd_t infd, fd_t outfd, fd_t errfd)
 {
     int status;
     pid_t pid = fork();
     if (pid)
     {
-        pid_t child = waitpid(pid, &status);
-        // printf("wait pid %d status %d %d\n", child, status, time());
-        return;
+        if (infd != EOF)
+        {
+            close(infd);
+        }
+        if (outfd != EOF)
+        {
+            close(outfd);
+        }
+        if (errfd != EOF)
+        {
+            close(errfd);
+        }
+        return pid;
     }
-    // execve 除非文件不合法，否则不会返回
+    if (infd != EOF)
+    {
+        fd_t fd = dup2(infd, STDIN_FILENO);
+        close(infd);
+    }
+    if (outfd != EOF)
+    {
+        fd_t fd = dup2(outfd, STDOUT_FILENO);
+        close(outfd);
+    }
+    if (errfd != EOF)
+    {
+        fd_t fd = dup2(errfd, STDERR_FILENO);
+        close(errfd);
+    }
+
     int i = execve(filename, argv, envp);
     exit(i);
+}
+
+// 执行程序
+void builtin_exec(int argc, char *argv[])
+{
+    stat_t statbuf;
+    sprintf(buf, "/bin/%s.out", argv[0]);
+    if (stat(buf, &statbuf) == EOF)
+    {
+        printf("osh : command not found: %s \n", argv[0]);
+        return;
+    }
+    
+    int status;
+    fd_t dupfd[3];
+
+    dupfile(argc, argv, dupfd);
+
+    pid_t pid = builtin_command(buf, &argv[1], dupfd[0], dupfd[1], dupfd[2]);
+    waitpid(pid, &status);
 }
 
 // 执行命令
@@ -246,15 +391,7 @@ static void execute(int argc, char *argv[])
         return builtin_mkfs(argc, argv);
     }
 
-    stat_t stat_buf;
-    sprintf(buf, "/bin/%s.out", argv[0]);
-    if (stat(buf, &stat_buf) == EOF)
-    {
-        printf("osh: command not found : %s\n", argv[0]);
-        return;
-    }
-
-    return builtin_exec(buf, argc - 1, &argv[1]);
+    return builtin_exec(argc, argv);
 }
 
 // 读取一行
