@@ -4,6 +4,8 @@
 #include <phinix/stdlib.h>
 #include <phinix/assert.h>
 
+#define BUF_COUNT 4 // 堆内存缓存页数量
+
 extern u32 free_pages;
 static arena_descriptor_t descriptors[DESC_COUNT];
 
@@ -15,6 +17,7 @@ void arena_init()
     {
         arena_descriptor_t *desc = &descriptors[i];
         desc->block_size = block_size;
+        desc->page_count = 0;
         desc->total_block = (PAGE_SIZE - sizeof(arena_t)) / block_size;
         list_init(&desc->free_list);
         block_size <<= 1;
@@ -79,6 +82,8 @@ void *kmalloc(size_t size)
         arena = (arena_t *)alloc_kpage(1);
         memset(arena, 0, PAGE_SIZE);
 
+        desc->page_count++;
+
         arena->desc = desc;
         arena->large = false;
         arena->count = desc->total_block;
@@ -127,7 +132,7 @@ void kfree(void *ptr)
     arena->count++;
 
     // 如果所有内存块都空闲，将空闲块从空闲链表移除,则像操作系统返回这一页
-    if (arena->count == arena->desc->total_block)
+    if (arena->count == arena->desc->total_block && arena->desc->page_count > BUF_COUNT)
     {
         for (size_t i = 0; i < arena->desc->total_block; i++)
         {
@@ -137,6 +142,8 @@ void kfree(void *ptr)
             assert(!list_search(&arena->desc->free_list, block));
         }
         free_kpage((u32)arena, 1);
+        arena->desc->page_count--;
+        assert(arena->desc->page_count >= BUF_COUNT);
     }
     
 }

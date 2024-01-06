@@ -362,7 +362,7 @@ void keyboard_handler(int vector)
     // 计算shift状态
     bool shift = false;
     // 大写锁定打开，shift状态取反（只对字幕有效）
-    if (capslock_state && ('a' <= keymap[makecode][0] <= 'z'))
+    if (capslock_state && ('a' <= keymap[makecode][0] && keymap[makecode][0] <= 'z'))
     {
         shift = !shift;
     }
