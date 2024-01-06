@@ -3,6 +3,7 @@
 #include <phinix/assert.h>
 #include <phinix/debug.h>
 #include <phinix/task.h>
+#include <phinix/timer.h>
 
 #define PIT_CHAN0_REG 0x40
 #define PIT_CHAN2_REG 0x42
@@ -16,44 +17,35 @@
 #define SPEAKER_REG 0X61
 #define BEEP_HZ 440
 #define BEEP_COUNTER (OSCILLATOR / BEEP_HZ)
+#define BEEP_MS 100
 
 // 时间片计数器
 u32 volatile jiffies = 0;
 u32 jiffy = JIFFY;
 
-u32 volatile beeping = 0;
+bool volatile beeping = 0;
 
 void start_beep()
 {
     if (!beeping)
     {
         out_byte(SPEAKER_REG, in_byte(SPEAKER_REG) | 0b11);
-    }
-    beeping = jiffies + 5;
-}
-
-void stop_beep()
-{
-    if (beeping && jiffies > beeping)
-    {
+        beeping = true;
+        task_sleep(BEEP_MS);
         out_byte(SPEAKER_REG, in_byte(SPEAKER_REG) & 0xfc);
-        beeping = 0;
+        beeping = false;
     }
 }
-
-extern void task_wakeup();
 
 void clock_handler(int vector)
 {
     assert(vector == 0x20);
     send_eoi(vector); // 发送中断处理结束
-
-    stop_beep();    // 检测并停止蜂鸣器
-
-    task_wakeup(); // 唤醒睡眠结束的任务
     
     jiffies++;
     // DEBUGK("clock jiffies %d ...\n", jiffies);
+
+    timer_wakeup();
 
     task_t *task = running_task();
     assert(task->magic == PHINIX_MAGIC);
