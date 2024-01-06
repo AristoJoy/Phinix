@@ -32,13 +32,6 @@ static char phinix_logo[][52] = {
     "                          \\/        \\/         \\/\n\0",
 };
 
-// static char *phinix_logo[] = {
-//     "\033[0m\t\t\t        \033[34m____  \033[32m     \033[35m_      \n\0",
-//     "\033[0m\t\t\t       \033[34m/ __ \\\033[32m___  \033[35m(_)\033[33m_ __ \n\0",
-//     "\033[0m\t\t\t      \033[34m/ /_/ \033[32m/ _ \\\033[35m/ /\033[33m\\ \\ / \n\0",
-//     "\033[0m\t\t\t      \033[34m\\____\033[32m/_//_\033[35m/_/\033[33m/_\\_\\  \n\0",
-// };
-
 extern char *strsep(const char *str);
 extern char *strrsep(const char *str);
 
@@ -275,7 +268,7 @@ rollback:
     return EOF;
 }
 
-pid_t builtin_command(char *filename, char *argv[], fd_t infd, fd_t outfd, fd_t errfd)
+pid_t builtin_command(char *filename, char *argv[], fd_t infd, fd_t outfd, fd_t errfd, pid_t *pgid)
 {
     int status;
     pid_t pid = fork();
@@ -292,6 +285,10 @@ pid_t builtin_command(char *filename, char *argv[], fd_t infd, fd_t outfd, fd_t 
         if (errfd != EOF)
         {
             close(errfd);
+        }
+        if (*pgid == 0)
+        {
+            *pgid = pid;
         }
         return pid;
     }
@@ -310,6 +307,9 @@ pid_t builtin_command(char *filename, char *argv[], fd_t infd, fd_t outfd, fd_t 
         fd_t fd = dup2(errfd, STDERR_FILENO);
         close(errfd);
     }
+
+    // 设置进程组 pgid
+    setpgid(0, *pgid);
 
     int i = execve(filename, argv, envp);
     exit(i);
@@ -333,6 +333,7 @@ void builtin_exec(int argc, char *argv[])
     fd_t infd = dupfd[0];
     fd_t pipefd[2];
     int count = 0;
+    pid_t pgid = 0;
     for (size_t i = 0; i < argc; i++)
     {
         if (!argv[i])
@@ -344,7 +345,7 @@ void builtin_exec(int argc, char *argv[])
         {
             argv[i] = NULL;
             int ret = pipe(pipefd);
-            builtin_command(name, bargv, infd, pipefd[1], EOF);
+            builtin_command(name, bargv, infd, pipefd[1], EOF, &pgid);
             count++;
             infd = pipefd[0];
             int len = strlen(name) + 1;
@@ -370,7 +371,7 @@ void builtin_exec(int argc, char *argv[])
         
     }
 
-    int pid = builtin_command(name, bargv, infd, dupfd[1], dupfd[2]);
+    int pid = builtin_command(name, bargv, infd, dupfd[1], dupfd[2], &pgid);
     for (size_t i = 0; i <= count; i++)
     {
         pid_t child = waitpid(-1, &status);
@@ -542,6 +543,8 @@ static int cmd_parse(char *cmd, char *argv[])
 
 int main()
 {
+    setsid();
+
     memset(cmd, 0, sizeof(cmd));
     memset(cwd, 0, sizeof(cwd));
 
