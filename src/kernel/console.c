@@ -118,7 +118,7 @@ static void scroll_up()
         screen = MEM_BASE;
     }
 
-    u32 *ptr = (u32 *)(screen + SCR_SIZE); // 没有冒出来的那行清空
+    u16 *ptr = (u16 *)(screen + SCR_SIZE); // 没有冒出来的那行清空
     for (size_t i = 0; i < WIDTH; i++)
     {
         *ptr++ = erase;
