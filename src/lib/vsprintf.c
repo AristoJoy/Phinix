@@ -63,7 +63,7 @@ static char *number(char *str, unsigned long num, int base, int size, int precis
     if ((flags & SIGN) && ((long)num) < 0)
     {
         sign = '-';
-        num = -num;
+        num = -(long)num;
     }
     // 如果指定了输出符号位，则输出+；否则指定了空格，则输出空格到符号位；否则置0
     else

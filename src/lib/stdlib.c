@@ -46,7 +46,7 @@ int atoi(const char *str)
         return 0;
     }
 
-    bool sign = 1;
+    int sign = 1;
     int result = 0;
     if (*str == '-')
     {
@@ -58,5 +58,5 @@ int atoi(const char *str)
         result = result * 10 + (*str - '0');
     }
     
-    return result;
+    return result * sign;
 }
