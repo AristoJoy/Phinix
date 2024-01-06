@@ -2,7 +2,7 @@
 #include <phinix/task.h>
 #include <phinix/interrupt.h>
 #include <phinix/assert.h>
-
+#include <phinix/errno.h>
 
 // 初始化互斥量
 void mutex_init(mutex_t *mutex)
@@ -22,7 +22,7 @@ void mutex_lock(mutex_t *mutex)
     while (mutex->value == true)
     {
         // 若value为true，表示锁已经被别人持有
-        task_block(current, &mutex->waiters, TASK_BLOCKED);
+        task_block(current, &mutex->waiters, TASK_BLOCKED, TIMELESS);
     }
 
     // 无人持有
@@ -55,7 +55,7 @@ void mutex_unlock(mutex_t *mutex)
         task_t *task = element_entry(task_t, node, mutex->waiters.tail.prev);
         assert(task->magic == PHINIX_MAGIC);
 
-        task_unblock(task);
+        task_unblock(task, EOK);
         // 保证新检测（因为unblock后马上去block了）能够获得互斥量，不然可能饿死
         task_yield();
     }

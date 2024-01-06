@@ -9,6 +9,7 @@
 #include <phinix/assert.h>
 #include <phinix/debug.h>
 #include <phinix/device.h>
+#include <phinix/errno.h>
 
 #define LOGK(fmt, args...) DEBUGK(fmt, ##args)
 
@@ -125,7 +126,7 @@ static void ide_handler(int vector)
     LOGK("hard disk interrupt vector %d state 0x%x\n", vector, state);
     if (ctrl->waiter)
     {
-        task_unblock(ctrl->waiter);
+        task_unblock(ctrl->waiter, EOK);
         ctrl->waiter = NULL;
     }
 }
@@ -291,7 +292,7 @@ int ide_pio_read(ide_disk_t *disk, void *buf, u8 count, idx_t lba)
         {
             // 阻塞自己等待中断到来，等待磁盘准备数据
             ctrl->waiter = task;
-            task_block(task, NULL, TASK_BLOCKED);
+            task_block(task, NULL, TASK_BLOCKED, TIMELESS);
         }
 
         ide_busy_wait(ctrl, IDE_SR_DRQ);
@@ -338,7 +339,7 @@ int ide_pio_write(ide_disk_t *disk, void *buf, u8 count, idx_t lba)
         {
             // 阻塞自己等待中断到来，等待磁盘写数据
             ctrl->waiter = task;
-            task_block(task, NULL, TASK_BLOCKED);
+            task_block(task, NULL, TASK_BLOCKED, TIMELESS);
         }
         ide_busy_wait(ctrl, IDE_SR_NULL);
     }

@@ -5,6 +5,7 @@
 #include <phinix/device.h>
 #include <phinix/string.h>
 #include <phinix/task.h>
+#include <phinix/errno.h>
 
 #define LOGK(fmt, args...) DEBUGK(fmt, ##args)
 
@@ -127,7 +128,7 @@ static buffer_t *get_free_buffer()
         }
 
         // 等待某个缓冲释放
-        task_block(running_task(), &wait_list, TASK_BLOCKED);
+        task_block(running_task(), &wait_list, TASK_BLOCKED, TIMELESS);
     }
 }
 
@@ -214,7 +215,7 @@ void brelse(buffer_t *bf)
     if (!list_empty(&wait_list))
     {
         task_t *task = element_entry(task_t, node, list_popback(&wait_list));
-        task_unblock(task);
+        task_unblock(task, EOK);
     }
 }
 
