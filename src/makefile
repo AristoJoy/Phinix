@@ -12,6 +12,7 @@ CFLAGS+= -fno-pie     # 不需要位置无关的可执行程序 position indepen
 CFLAGS+= -nostdlib   # 不需要 gcc 标准库
 CFLAGS+= -fno-stack-protector   # 不需要栈保护
 CFLAGS+= -DPHINIX # 定义PHINIX
+# CFLAGS+= -DPHINIX_DEBUG # 定义PHINIX_DEBUG
 CFLAGS:=$(strip ${CFLAGS})
 
 DEBUG:= -g
@@ -107,6 +108,8 @@ $(BUILD)/kernel.bin: \
 	$(BUILD)/lib/syscall.o  \
 	$(BUILD)/lib/list.o  \
 	$(BUILD)/lib/fifo.o  \
+	$(BUILD)/lib/printf.o  \
+	$(BUILD)/builtin/osh.o  \
 
 	$(shell mkdir -p $(dir $@))
 	ld ${LDFLAGS} $^ -o $@ 

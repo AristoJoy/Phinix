@@ -307,6 +307,7 @@ static task_t *task_create(target_t target, const char *name, u32 priority, u32 
 }
 
 extern int sys_execve();
+extern int init_user_thread();
 
 // 切换回用户模式
 void task_to_user_mode()
@@ -346,14 +347,22 @@ void task_to_user_mode()
 
     iframe->error = PHINIX_MAGIC;
 
-    iframe->eip = 0;
+    iframe->eip = (u32)init_user_thread;
     iframe->eflags = (0 << 12 | 0b10 | 1 << 9); // IOPL 为0 IF 为1
 
     // 用户栈顶
     iframe->esp = USER_STACK_TOP;
 
+#ifdef PHINIX_DEBUG
+    // ROP技术，直接从中断返回
+    // 通过eip跳转到entry执行
+    asm volatile(
+        "movl %0, %%esp\n"
+        "jmp interrupt_exit\n"::"m"(iframe));
+#else
     int err = sys_execve("/bin/init.out", NULL, NULL);
     panic("exec /bin/init.out failure");
+#endif
 }
 
 extern void interrupt_exit();
