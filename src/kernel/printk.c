@@ -1,8 +1,7 @@
 #include <phinix/stdarg.h>
 #include <phinix/console.h>
 #include <phinix/stdio.h>
-
-extern int32 console_write();
+#include <phinix/device.h>
 
 static char buf[1024];
 
@@ -16,7 +15,8 @@ int printk(const char *fmt, ...)
 
     va_end(args);
 
-    console_write(NULL, buf, i);
+    device_t *device = device_find(DEV_CONSOLE, 0);
+    device_write(device->dev, buf, i, 0, 0);
 
     return i;
 }

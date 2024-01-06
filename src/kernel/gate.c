@@ -86,8 +86,6 @@ extern mode_t sys_umask();
 extern int sys_stat();
 extern int sys_fstat();
 
-extern void console_clear();
-
 extern int sys_mknod();
 extern int sys_mount();
 extern int sys_umount();
@@ -151,7 +149,6 @@ void syscall_init()
     syscall_table[SYS_NR_TIME] = sys_time;
 
     syscall_table[SYS_NR_UMASK] = sys_umask;
-    syscall_table[SYS_NR_CLEAR] = console_clear;
 
     syscall_table[SYS_NR_STAT] = sys_stat;
     syscall_table[SYS_NR_FSTAT] = sys_fstat;

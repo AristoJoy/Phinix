@@ -43,8 +43,7 @@ typedef enum syscall_t
     SYS_NR_SLEEP = 158,
     SYS_NR_YIELD = 162,
     SYS_NR_GETCWD = 183,
-    SYS_NR_CLEAR = 200,
-    SYS_NR_MKFS = 201,
+    SYS_NR_MKFS = 200,
 } syscall_t;
 
 #if 0
@@ -143,9 +142,6 @@ int unlink(char *filename);
 time_t time();
 
 mode_t umask(mode_t mask);
-
-// 清屏
-void clear();
 
 // 获取文件状态
 int stat(char *filename, stat_t *statbuf);

@@ -267,11 +267,6 @@ mode_t umask(mode_t mask)
     return _syscall1(SYS_NR_UMASK, (u32)mask);
 }
 
-void clear()
-{
-    _syscall0(SYS_NR_CLEAR);
-}
-
 // 获取文件状态
 int stat(char *filename, stat_t *statbuf)
 {

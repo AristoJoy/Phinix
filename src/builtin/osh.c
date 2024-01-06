@@ -32,6 +32,13 @@ static char phinix_logo[][52] = {
     "                          \\/        \\/         \\/\n\0",
 };
 
+// static char *phinix_logo[] = {
+//     "\033[0m\t\t\t        \033[34m____  \033[32m     \033[35m_      \n\0",
+//     "\033[0m\t\t\t       \033[34m/ __ \\\033[32m___  \033[35m(_)\033[33m_ __ \n\0",
+//     "\033[0m\t\t\t      \033[34m/ /_/ \033[32m/ _ \\\033[35m/ /\033[33m\\ \\ / \n\0",
+//     "\033[0m\t\t\t      \033[34m\\____\033[32m/_//_\033[35m/_/\033[33m/_\\_\\  \n\0",
+// };
+
 extern char *strsep(const char *str);
 extern char *strrsep(const char *str);
 
@@ -56,7 +63,13 @@ void print_prompt()
         *ptr = 0;
     }
     char *base = basename(cwd);
-    printf("[root %s]#", base);
+    printf("\033[30;45m[root %s]\033[0m#", base);
+}
+
+// 清屏
+void clear()
+{
+    printf("\x1b[2J\x1b[0;0H");
 }
 
 void builtin_logo()
