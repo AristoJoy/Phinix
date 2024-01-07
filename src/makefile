@@ -83,7 +83,8 @@ $(BUILD)/kernel.bin: \
 	$(BUILD)/kernel/interrupt.o  \
 	$(BUILD)/kernel/handler.o  \
 	$(BUILD)/kernel/task.o  \
-	$(BUILD)/kernel/thread.o  \
+	$(BUILD)/kernel/init.o  \
+	$(BUILD)/kernel/idle.o  \
 	$(BUILD)/kernel/mutex.o  \
 	$(BUILD)/kernel/clock.o  \
 	$(BUILD)/kernel/timer.o  \
