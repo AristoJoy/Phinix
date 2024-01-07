@@ -7,6 +7,7 @@
 #include <phinix/stat.h>
 #include <phinix/time.h>
 #include <phinix/tty.h>
+#include <phinix/signal.h>
 
 #define MAX_CMD_LEN 256
 #define MAX_ARG_NR 16
@@ -32,6 +33,8 @@ static char phinix_logo[][52] = {
     "            |____|   |___|  /__|___|  /__/__/\\_ \\\n\0",
     "                          \\/        \\/         \\/\n\0",
 };
+
+static bool interrupt = false;
 
 extern char *strsep(const char *str);
 extern char *strrsep(const char *str);
@@ -317,7 +320,7 @@ pid_t builtin_command(char *filename, char *argv[], fd_t infd, fd_t outfd, fd_t 
         ioctl(STDIN_FILENO, TIOCSPGRP, getpid());
     }
     
-
+    signal(SIGINT, (int)SIG_DFL);
     int i = execve(filename, argv, envp);
     exit(i);
 }
@@ -555,8 +558,18 @@ static int cmd_parse(char *cmd, char *argv[])
     return argc;
 }
 
+// 信号处理函数
+static int signal_handler(int sig)
+{
+    signal(SIGINT, (int)signal_handler);
+    interrupt = true;
+}
+
 int main()
 {
+    // 注册信号 CTRL + C
+    signal(SIGINT, (int)signal_handler);
+    
     // 新建会话
     setsid();
     // 设置 TTY 进程组为osh
@@ -571,6 +584,13 @@ int main()
     {
         print_prompt();
         readline(cmd, sizeof(cmd));
+        if (interrupt)
+        {
+            // 如果按下了 CTRL + C，则重新读取命令
+            interrupt = false;
+            continue;
+        }
+        
         if (cmd[0] == 0)
         {
             continue;

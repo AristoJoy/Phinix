@@ -6,10 +6,36 @@
 #include <phinix/mutex.h>
 #include <phinix/debug.h>
 #include <phinix/errno.h>
+#include <phinix/syscall.h>
 
 #define LOGK(fmt, args...) DEBUGK(fmt, ##args)
 
+extern task_t *task_table[TASK_NR]; //任务表
 static tty_t typewriter;
+
+// 向前台组进程发送SIGINT信号
+int tty_intr()
+{
+    tty_t *tty = &typewriter;
+    if (!tty->pgid)
+    {
+        return 0;
+    }
+    for (size_t i = 0; i < TASK_NR; i++)
+    {
+        task_t *task = task_table[i];
+        if (!task)
+        {
+            continue;
+        }
+        if (task->pgid != tty->pgid)
+        {
+            continue;
+        }
+        kill(task->pid, SIGINT);
+    }
+    return 0;
+}
 
 // tty读通知
 int tty_rx_notify(char *ch, bool ctrl, bool shift, bool alt)
@@ -33,6 +59,8 @@ int tty_rx_notify(char *ch, bool ctrl, bool shift, bool alt)
     case 'c':
     case 'C':
         LOGK("CTRL + C Pressed\n");
+        tty_intr();
+        *ch = '\n';
         break;
     case 'l':
     case 'L':

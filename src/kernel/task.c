@@ -28,8 +28,8 @@ extern file_t file_table[];
 extern void task_switch(task_t *next);
 
 task_t *task_table[TASK_NR]; // 任务表
-static list_t block_list;           // 任务默认阻塞链表
-static list_t sleep_list;           // 任务睡眠链表
+static list_t block_list;    // 任务默认阻塞链表
+static list_t sleep_list;    // 任务睡眠链表
 
 static task_t *idle_task; // 基础任务
 
@@ -48,6 +48,23 @@ static task_t *get_free_task()
         }
     }
     panic("No more tasks");
+}
+
+// 获取对应pid对应的task
+task_t *get_task(pid_t pid)
+{
+    for (size_t i = 0; i < TASK_NR; i++)
+    {
+        if (!task_table[i])
+        {
+            continue;
+        }
+        if (task_table[i]->pid == pid)
+        {
+            return task_table[i];
+        }
+    }
+    return NULL;
 }
 
 // 获取任务id
@@ -152,13 +169,13 @@ int task_block(task_t *task, list_t *blist, task_state_t state, int timeout_ms)
     }
 
     assert(state != TASK_READY && state != TASK_RUNNING);
-    
+
     list_push(blist, &task->node);
     if (timeout_ms > 0)
     {
         timer_add(timeout_ms, NULL, NULL);
     }
-    
+
     task->state = state;
 
     task_t *current = running_task();
@@ -284,6 +301,18 @@ static task_t *task_create(target_t target, const char *name, u32 priority, u32 
     task->files[STDIN_FILENO]->count++;
     task->files[STDOUT_FILENO]->count++;
     task->files[STDERR_FILENO]->count++;
+
+    // 初始化信号
+    task->signal = 0;
+    task->blocked = 0;
+    for (size_t i = 0; i < MAXSIG; i++)
+    {
+        sigaction_t *action = &task->actions[i];
+        action->flags = 0;
+        action->mask = 0;
+        action->handler = SIG_DFL;
+        action->restorer = NULL;
+    }
 
     task->magic = PHINIX_MAGIC;
 
@@ -429,6 +458,63 @@ pid_t task_fork()
     return child->pid;
 }
 
+// 如果经常是会话首领，这向会话中的所有进程发送信号 SIGHUP
+static void task_kill_session(task_t *task)
+{
+    if (!task_leader(task))
+    {
+        return;
+    }
+    for (size_t i = 0; i < TASK_NR; i++)
+    {
+        task_t *child = task_table[i];
+        if (!child)
+        {
+            continue;
+        }
+        if (task == child || task->sid != child->sid)
+        {
+            continue;
+        }
+        child->signal |= SIGMASK(SIGHUP);
+    }
+}
+
+// 释放 TTY 设备
+static void task_free_tty(task_t *task)
+{
+    if (task_leader(task) && task->tty > 0)
+    {
+        device_t *device = device_get(task->tty);
+        tty_t *tty = (tty_t *)device->ptr;
+        tty->pgid = 0;
+    }
+}
+
+// 子进程退出，通知父进程
+static void task_tell_fater(task_t *task)
+{
+    if (!task->ppid)
+    {
+        return;
+    }
+    for (size_t i = 0; i < TASK_NR; i++)
+    {
+        task_t *parent = task_table[i];
+        if (!parent)
+        {
+            continue;
+        }
+        if (parent->pid != task->ppid)
+        {
+            continue;
+        }
+        parent->signal |= SIGMASK(SIGCHLD);
+        return;
+    }
+    panic("No Parent found!!!");
+}
+
 // 退出任务
 void task_exit(int status)
 {
@@ -439,18 +525,9 @@ void task_exit(int status)
     task->state = TASK_DIED;
     task->status = status;
 
-    if (task_leader(task))
-    {
-        // todo kill session
-    }
-    
-    // 释放TTY设备
-    if (task_leader(task) && task->tty > 0)
-    {
-        device_t *device = device_get(task->tty);
-        tty_t *tty = (tty_t *)device->ptr;
-        tty->pgid = 0;
-    }
+    task_kill_session(task);
+    task_tell_fater(task);
+    task_free_tty(task);
 
     timer_remove(task);
 

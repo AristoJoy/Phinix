@@ -1,4 +1,5 @@
 #include <phinix/syscall.h>
+#include <phinix/signal.h>
 
 static _inline u32 _syscall0(u32 func_code)
 {
@@ -99,6 +100,11 @@ int execve(char *filename, char *argv[], char *envp[])
     return _syscall3(SYS_NR_EXECVE, (u32)filename, (u32)argv, (u32)envp);
 }
 
+int kill(pid_t pid, int signal)
+{
+    return _syscall2(SYS_NR_KILL, pid, signal);
+}
+
 void yield()
 {
     _syscall0(SYS_NR_YIELD);
@@ -149,7 +155,7 @@ int stty()
 // 获取终端设置信息
 int gtty()
 {
-    return _syscall0(SYS_NT_GTTY);
+    return _syscall0(SYS_NR_GTTY);
 }
 
 // 操作IO设备
@@ -319,4 +325,29 @@ int fstat(fd_t fd, stat_t *statbuf)
 int mkfs(char *devname, int icount)
 {
     return _syscall2(SYS_NR_MKFS, (u32)devname, (u32)icount);
+}
+
+// 获取信号屏蔽码
+int sgetmask()
+{
+    return _syscall0(SYS_NR_SGETMASK);
+}
+
+// 设置信号屏蔽码
+int ssetmask(int newmask)
+{
+    return _syscall1(SYS_NR_SSETMASK, (u32)newmask);
+}
+
+extern void restorer();
+
+// 注册信号处理函数
+int signal(int sig, int handler)
+{
+    return _syscall3(SYS_NR_SIGNAL, (u32)sig, (u32)handler, (u32)restorer);
+}
+// 注册信号处理函数，并且返回旧信号处理函数
+int sigaction(int sig, sigaction_t *action, sigaction_t *oldaction)
+{
+    return _syscall3(SYS_NR_SIGACTION, (u32)sig, (u32)action, (u32)oldaction);
 }

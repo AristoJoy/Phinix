@@ -16,12 +16,11 @@
 handler_t syscall_table[SYSCALL_SIZE];
 
 void syscall_check(u32 func_code)
-{   
+{
     if (func_code >= SYSCALL_SIZE)
     {
         panic("syscall func code error!!!");
     }
-    
 }
 
 static void syscall_default()
@@ -32,7 +31,7 @@ static void syscall_default()
 task_t *task = NULL;
 
 static u32 sys_test()
-{    
+{
     char ch;
     device_t *device;
 
@@ -60,6 +59,7 @@ extern int sys_lseek();
 extern int sys_readdir();
 
 extern void sys_execve();
+extern int sys_kill();
 
 extern fd_t sys_dup();
 extern fd_t sys_dup2();
@@ -102,6 +102,11 @@ extern int sys_stty();
 extern int sys_gtty();
 extern int sys_ioctl();
 
+extern int sys_signal();
+extern int sys_sgetmask();
+extern int sys_ssetmask();
+extern int sys_sigaction();
+
 extern int sys_mkfs();
 
 void syscall_init()
@@ -111,13 +116,14 @@ void syscall_init()
     {
         syscall_table[i] = syscall_default;
     }
-    
+
     syscall_table[SYS_NR_TEST] = sys_test;
 
     syscall_table[SYS_NR_EXIT] = task_exit;
     syscall_table[SYS_NR_FORK] = task_fork;
     syscall_table[SYS_NR_WAITPID] = task_waitpid;
-    
+    syscall_table[SYS_NR_KILL] = sys_kill;
+
     syscall_table[SYS_NR_SLEEP] = task_sleep;
     syscall_table[SYS_NR_YIELD] = task_yield;
 
@@ -131,7 +137,7 @@ void syscall_init()
     syscall_table[SYS_NR_SETSID] = sys_setsid;
 
     syscall_table[SYS_NR_STTY] = sys_stty;
-    syscall_table[SYS_NT_GTTY] = sys_gtty;
+    syscall_table[SYS_NR_GTTY] = sys_gtty;
     syscall_table[SYS_NR_IOCTL] = sys_ioctl;
 
     syscall_table[SYS_NR_BRK] = sys_brk;
@@ -174,4 +180,9 @@ void syscall_init()
     syscall_table[SYS_NR_UMOUNT] = sys_umount;
 
     syscall_table[SYS_NR_MKFS] = sys_mkfs;
+
+    syscall_table[SYS_NR_SIGNAL] = sys_signal;
+    syscall_table[SYS_NR_SGETMASK] = sys_sgetmask;
+    syscall_table[SYS_NR_SSETMASK] = sys_ssetmask;
+    syscall_table[SYS_NR_SIGACTION] = sys_sigaction;
 }
