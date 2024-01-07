@@ -140,7 +140,8 @@ void default_handler(int vector)
     DEBUGK("[%x] default interrupt called\n", vector);
 }
 
-void exception_handler(
+void 
+exception_handler(
     int vector,
     u32 edi, u32 esi, u32 ebp, u32 esp,
     u32 ebx, u32 edx, u32 ecx, u32 eax,
@@ -157,9 +158,7 @@ void exception_handler(
         msg = messages[15];
     }
 
-    printk("Exception : [0x%02X] %s \n", vector, messages[vector]);
-
-    printk("\nEXCEPTION : %s \n", messages[vector]);
+    printk("\nEXCEPTION : %s \n", msg);
     printk("   VECTOR : 0x%02X\n", vector);
     printk("    ERROR : 0x%08X\n", error);
     printk("   EFLAGS : 0x%08X\n", eflags);

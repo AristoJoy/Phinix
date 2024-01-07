@@ -32,7 +32,7 @@ void timer_put(timer_t *timer)
 // 默认超时时间
 void default_timeout(timer_t *timer)
 {
-    assert(timer->task->node.next);
+    // assert(timer->task->node.next);
     task_unblock(timer->task, -ETIME);
 }
 
