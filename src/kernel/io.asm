@@ -66,3 +66,35 @@ out_word:
 
     leave   ; 恢复栈帧
     ret
+
+global in_dword ; 将in_dword导出
+in_dword:
+    push ebp
+    mov ebp, esp   ; 保持栈帧
+
+    xor eax, eax ; 将eax 清空
+    mov edx, [ebp + 8] ; port
+    in eax, dx ; 将端口dx的32bit输入到eax
+
+    jmp $+2     ; 一点延迟
+    jmp $+2
+    jmp $+2
+
+    leave   ; 恢复栈帧
+    ret
+
+global out_dword ; 将out_dword导出
+out_dword:
+    push ebp
+    mov ebp, esp   ; 保持栈帧
+
+    mov edx, [ebp + 8] ; port
+    mov eax, [ebp + 12] ; value
+    out dx, eax ; 将eax的32bit输出到端口
+
+    jmp $+2     ; 一点延迟
+    jmp $+2
+    jmp $+2
+
+    leave   ; 恢复栈帧
+    ret
