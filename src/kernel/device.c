@@ -8,8 +8,6 @@
 
 #define LOGK(fmt, args...) DEBUGK(fmt, ##args)
 
-#define DEVICE_NR 64 // 设备数量
-
 #define DEV_REQ_IDX_OFFSET element_node_offset(request_t, node, idx)
 
 static device_t devices[DEVICE_NR]; // 设备数组

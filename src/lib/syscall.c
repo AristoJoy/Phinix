@@ -141,6 +141,23 @@ int setsid()
     return _syscall0(SYS_NR_SETSID);
 }
 
+// 终端设置
+int stty()
+{
+    return _syscall0(SYS_NR_STTY);
+}
+// 获取终端设置信息
+int gtty()
+{
+    return _syscall0(SYS_NT_GTTY);
+}
+
+// 操作IO设备
+int ioctl(fd_t fd, int cmd, int args)
+{
+    return _syscall3(SYS_NR_IOCTL, fd, cmd, args);
+}
+
 // brk调用
 int32 brk(void *addr)
 {

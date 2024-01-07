@@ -13,6 +13,8 @@
 #include <phinix/arena.h>
 #include <phinix/errno.h>
 #include <phinix/timer.h>
+#include <phinix/device.h>
+#include <phinix/tty.h>
 
 #define LOGK(fmt, args...) DEBUGK(fmt, ##args)
 #define TASK_INSET_OFFSET element_node_offset(task_t, node, ticks)
@@ -442,6 +444,13 @@ void task_exit(int status)
         // todo kill session
     }
     
+    // 释放TTY设备
+    if (task_leader(task) && task->tty > 0)
+    {
+        device_t *device = device_get(task->tty);
+        tty_t *tty = (tty_t *)device->ptr;
+        tty->pgid = 0;
+    }
 
     timer_remove(task);
 

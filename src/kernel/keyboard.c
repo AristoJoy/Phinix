@@ -266,6 +266,8 @@ static void keyboard_ack()
     } while (state != KEYBOARD_CMD_ACK);
 }
 
+extern int tty_rx_notify();
+
 // 设置led灯状态
 static void set_leds()
 {
@@ -391,6 +393,14 @@ void keyboard_handler(int vector)
     }
 
     // LOGK("keydown %c \n", ch);
+
+    // 通知tty设备处理输入字符
+    if (tty_rx_notify(&ch, ctrl_state, shift_state, alt_state) > 0)
+    {
+        return;
+    }
+    
+
     fifo_put(&fifo, ch);
     if (waiter != NULL)
     {
