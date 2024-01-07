@@ -279,7 +279,7 @@ void mapping_init()
             page_entry_t *tentry = &pte[tidx];
             entry_init(tentry, index);
             tentry->user = USER_MEMORY; // 只能被内核访问
-            memory_map[index] = 1; //  设置物理内存数组，该页被占用
+            memory_map[index] = 1;      //  设置物理内存数组，该页被占用
         }
     }
 
@@ -327,6 +327,23 @@ page_entry_t *get_entry(u32 vaddr, bool create)
 {
     page_entry_t *pte = get_pte(vaddr, create);
     return &pte[TIDX(vaddr)];
+}
+
+// 获取虚拟地址 vaddr对应的物理地址
+u32 get_paddr(u32 vaddr)
+{
+    page_entry_t *pde = get_pde();
+    page_entry_t *entry = &pde[DIDX(vaddr)];
+    if (!entry->present)
+    {
+        return 0;
+    }
+    entry = get_entry(vaddr, false);
+    if (!entry->present)
+    {
+        return 0;
+    }
+    return PAGE(entry->index) | (vaddr & 0xfff);
 }
 
 // 刷新虚拟地址vaddr的快表 TLB
@@ -415,7 +432,7 @@ void unlink_page(u32 vaddr)
     {
         return;
     }
-    
+
     entry = get_entry(vaddr, false);
 
     // 如果页面不存在，直接返回
@@ -459,15 +476,9 @@ static u32 copy_page(void *page)
 page_entry_t *copy_pde()
 {
     task_t *task = running_task();
-    page_entry_t *pde = (page_entry_t *)alloc_kpage(1);
-    memcpy(pde, (void *)task->pde, PAGE_SIZE);
-
-    // 将最后一个页目录指向自己
-    page_entry_t *entry = &pde[1023];
-    // 这里由于从内核分配，物理地址和线性地址相同所以使用pde的idx
-    entry_init(entry, IDX(pde));
-
-    page_entry_t *dentry;
+    page_entry_t *pde = (page_entry_t *)task->pde;
+    page_entry_t *dentry = NULL;
+    page_entry_t *entry = NULL;
 
     // 前面是内核态内存，下面拷贝的是用户态的页目录
     for (size_t didx = (sizeof(KERNEL_PAGE_TABLE) / 4); didx < 1023; didx++)
@@ -477,6 +488,12 @@ page_entry_t *copy_pde()
         {
             continue;
         }
+        // 将所有页表置为只读
+        assert(memory_map[dentry->index] > 0);
+        dentry->write = false;
+        memory_map[dentry->index]++;
+        assert(memory_map[dentry->index] < 255);
+
         page_entry_t *pte = (page_entry_t *)(PDE_MASK | (didx << 12));
 
         for (size_t tidx = 0; tidx < 1024; tidx++)
@@ -486,7 +503,7 @@ page_entry_t *copy_pde()
             {
                 continue;
             }
-            
+
             // 对应的物理内存引用大于0
             assert(memory_map[entry->index] > 0);
 
@@ -500,11 +517,15 @@ page_entry_t *copy_pde()
 
             assert(memory_map[entry->index] < 255);
         }
-        
-        u32 paddr = copy_page(pte);
-        dentry->index = IDX(paddr);
     }
-    
+
+    pde = (page_entry_t *)alloc_kpage(1);
+    memcpy(pde, (void *)task->pde, PAGE_SIZE);
+
+    // 将最后一个页表指向页目录自己，方便修改
+    entry = &pde[1023];
+    entry_init(entry, IDX(pde));
+
     set_cr3(task->pde);
 
     return pde;
@@ -546,6 +567,56 @@ void free_pde()
     }
     free_kpage(task->pde, 1);
     LOGK("free pages %d\n", free_pages);
+}
+
+// 页表写时拷贝
+// vaddr 表示虚拟地址
+// level 表示层级，页目录，页表，页框
+void copy_on_write(u32 vaddr, int level)
+{
+    // 递归返回
+    if (level == 0)
+    {
+        return;
+    }
+    
+    // 获取当前虚拟地址对应的入口
+    page_entry_t *entry = get_entry(vaddr, false);
+    // 对该入口进行写时拷贝，于是页目录和页表拷贝完毕
+    copy_on_write((u32)entry, level - 1);
+
+    // 如果该地址已经可写，则返回
+    if (entry->write)
+    {
+        return;
+    }
+    
+    // 物理内存引用大于0
+    assert(memory_map[entry->index] > 0);
+
+    // 如果引用只有1个，则直接可写
+    if (memory_map[entry->index] == 1)
+    {
+        entry->write = true;
+        LOGK("WRITE page for 0x%p\n", vaddr);
+    }
+    else
+    {
+        // 否则拷贝该页
+        u32 paddr = copy_page((void *)PAGE(IDX(vaddr)));
+
+        // 物理内存引用减一
+        memory_map[entry->index]--;
+
+        // 设置新的物理页，可写
+        entry->index = IDX(paddr);
+        entry->write = true;
+        LOGK("COPY page for 0x%p\n", vaddr);
+    }
+    
+    // 刷新快表，很多错误发生在快表没有及时更新
+    assert(memory_map[entry->index] > 0);
+    flush_tlb(vaddr);
 }
 
 // 缺页错误编码（缺页中断会设置32位错误码）
@@ -593,7 +664,7 @@ int32 sys_brk(void *addr)
         return -1;
     }
     task->brk = brk;
-    
+
     return 0;
 }
 
@@ -618,7 +689,7 @@ void page_fault(
     task_t *task = running_task();
 
     // assert(KERNEL_MEMORY_SIZE <= vaddr && vaddr < USER_STACK_TOP);
-    
+
     // 如果用户程序访问了不该访问的内存
     if (vaddr < USER_EXEC_ADDR || vaddr >= USER_STACK_TOP)
     {
@@ -626,7 +697,6 @@ void page_fault(
         printk("Segmentation Fault!!!\n");
         task_exit(-1);
     }
-    
 
     // 用户只读内存(写时复制)
     if (code->present)
@@ -636,28 +706,14 @@ void page_fault(
 
         page_entry_t *entry = get_entry(vaddr, false);
 
-        assert(entry->present);     // 目前写内存应该是存在的
-        assert(!entry->shared);     // 共享内存页，不应该触发缺页
-        assert(!entry->readonly);   // 只读内存页不应该被写
-        
-        assert(memory_map[entry->index] > 0);
-        if (memory_map[entry->index] == 1)
-        {
-            entry->write = true;
-            LOGK("WRITE page for 0x%p\n", vaddr);
-        }
-        else
-        {
-            void *page = (void *)PAGE(IDX(vaddr));
-            u32 paddr = copy_page(page);
-            memory_map[entry->index]--;
-            entry_init(entry, IDX(paddr));
-            flush_tlb(vaddr);
-            LOGK("COPY page for 0x%p\n", vaddr);
-        }
+        assert(entry->present);   // 目前写内存应该是存在的
+        assert(!entry->shared);   // 共享内存页，不应该触发缺页
+        assert(!entry->readonly); // 只读内存页不应该被写
+
+        // 页表写时拷贝
+        copy_on_write(vaddr, 3);
         return;
     }
-    
 
     // 分配用户栈或堆内存
     if (!code->present && (vaddr < task->brk || vaddr >= USER_STACK_BOTTOM))
@@ -685,7 +741,7 @@ void *sys_mmap(void *addr, size_t length, int prot, int flags, int fd, off_t off
     {
         vaddr = scan_page(task->vmap, count);
     }
-    
+
     assert(vaddr >= USER_MMAP_ADDR && vaddr < USER_STACK_BOTTOM);
 
     for (size_t i = 0; i < count; i++)
@@ -718,7 +774,7 @@ void *sys_mmap(void *addr, size_t length, int prot, int flags, int fd, off_t off
         lseek(fd, offset, SEEK_SET);
         read(fd, (char *)vaddr, length);
     }
-    
+
     return (void *)vaddr;
 }
 
@@ -739,6 +795,6 @@ int sys_munmap(void *addr, size_t length)
         assert(bitmap_test(task->vmap, IDX(page)));
         bitmap_set(task->vmap, IDX(page), false);
     }
-    
+
     return 0;
 }
