@@ -55,6 +55,7 @@ void init_thread()
 {
     char temp[100]; // 为了栈顶有充足的空间，用于存储栈中的局部变量，不和intr_iframe_t冲突
     dev_init();
+    asm volatile("ud2\n"); // 假设我们的程序在这里发生了错误
     task_to_user_mode();
 }
 

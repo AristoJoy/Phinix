@@ -166,8 +166,16 @@ exception_handler(
     printk("      EIP : 0x%08X\n", eip);
     printk("      ESP : 0x%08X\n", esp);
 
+    bool hanging = true;
+
     // 阻塞
-    hang();
+    while (hanging)
+        ;
+
+    // 通过 EIP 的值应该可以找到出错的位置
+    // 也可以在出错时，可以将 hanging 在调试器中手动设置为 0
+    // 然后在下面 return 打断点，单步调试，找到出错的位置
+    return;
 }
 
 /**
