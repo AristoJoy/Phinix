@@ -15,11 +15,11 @@ $(BUILD)/master.img: $(BUILD)/boot/boot.bin \
 # 将 loader.bin 写入硬盘
 	dd if=$(BUILD)/boot/loader.bin of=$@ bs=512 count=4 seek=2 conv=notrunc
 
-# 测试 system.bin 小于 100k，否则需要修改下面的 count
-	test -n "$$(find $(BUILD)/system.bin -size -100k)"
+# 测试 system.bin 小于 127k，否则需要修改下面的 count
+	test -n "$$(find $(BUILD)/system.bin -size -127k)"
 
 # 将 system.bin 写入硬盘
-	dd if=$(BUILD)/system.bin of=$@ bs=512 count=200 seek=10 conv=notrunc
+	dd if=$(BUILD)/system.bin of=$@ bs=512 count=254 seek=10 conv=notrunc
 
 # 执行硬盘分区
 	sfdisk $@ < $(SRC)/utils/master.sfdisk
