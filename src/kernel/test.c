@@ -1,29 +1,24 @@
-# 0 "main.c"
-# 0 "<built-in>"
-# 0 "<command-line>"
-# 1 "/usr/include/stdc-predef.h" 1 3 4
-# 0 "<command-line>" 2
-# 1 "main.c"
-# 1 "../include/phinix/phinix.h" 1
+#include <phinix/types.h>
+#include <phinix/cpu.h>
+#include <phinix/printk.h>
+#include <phinix/debug.h>
+#include <phinix/errno.h>
 
+#define LOGK(fmt, args...) DEBUGK(fmt, ##args)
 
-
-
-
-void kernel_init();
-# 2 "main.c" 2
-
-int magic = 20231013;
-
-char message[] = "Hello phinix!!!";
-char buf[1024];
-
-void kernel_init()
+err_t sys_test()
 {
-    char *video = (char *) 0xb8000;
-    for (int i = 0; i < sizeof(message); i++)
-    {
-        video[i * 2] = message[i];
-    }
+    LOGK("test syscall ...\n");
 
+    cpu_vendor_t vendor;
+
+    cpu_vendor_id(&vendor);
+    printk("CPU vendor id: %s\n", vendor.info);
+    printk("CPU max value: 0x%x\n", vendor.max_value);
+
+    cpu_version_t ver;
+    cpu_version(&ver);
+    printk("FPU support state : %d\n", ver.FPU);
+    printk("APIC support state : %d\n", ver.APIC);
+    return EOK;
 }
