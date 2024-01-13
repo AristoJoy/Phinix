@@ -15,6 +15,7 @@
 #include <phinix/timer.h>
 #include <phinix/device.h>
 #include <phinix/tty.h>
+#include <phinix/fpu.h>
 
 #define LOGK(fmt, args...) DEBUGK(fmt, ##args)
 #define TASK_INSET_OFFSET element_node_offset(task_t, node, ticks)
@@ -255,8 +256,9 @@ void schedule()
         return;
     }
 
-    task_activate(next);
-    task_switch(next);
+    fpu_disable(current); // 当前进程禁用FPU
+    task_activate(next);  // 激活下一进程
+    task_switch(next);    // 调度到下一进程
 }
 
 static task_t *task_create(target_t target, const char *name, u32 priority, u32 uid)
@@ -430,6 +432,14 @@ pid_t task_fork()
     memcpy(buf, task->vmap->bits, PAGE_SIZE);
     child->vmap->bits = buf;
 
+    // 拷贝 FPU状态
+    if (task->fpu)
+    {
+        child->fpu = kmalloc(sizeof(fpu_t));
+        memcpy(child->fpu, task->fpu, sizeof(fpu_t));
+    }
+    
+
     // 拷贝页目录
     child->pde = (u32)copy_pde();
 
@@ -539,6 +549,14 @@ void task_exit(int status)
     free_kpage((u32)task->vmap->bits, 1);
     kfree(task->vmap);
 
+    // 释放 FPU 状态
+    if (task->fpu)
+    {
+        kfree(task->fpu);
+        task->fpu = NULL;
+        task->flags = 0;
+    }
+    
     free_kpage((u32)task->pwd, 1);
     iput(task->ipwd);
     iput(task->iroot);
@@ -651,5 +669,4 @@ void task_init()
     task_setup();
     idle_task = task_create(idle_thread, "idle", 1, KERNEL_USER);
     task_create(init_thread, "init", 5, NORMAL_USER);
-
 }
