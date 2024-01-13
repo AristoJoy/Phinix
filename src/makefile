@@ -59,6 +59,7 @@ BUILTIN_APPS := \
 	$(BUILD)/builtin/count.out \
 	$(BUILD)/builtin/alarm.out \
 	$(BUILD)/builtin/float.out \
+	$(BUILD)/builtin/player.out \
 
 $(BUILD)/builtin/%.out: $(BUILD)/builtin/%.o \
 	$(BUILD)/lib/libc.o \
@@ -109,6 +110,7 @@ $(BUILD)/kernel.bin: \
 	$(BUILD)/kernel/fpu.o \
 	$(BUILD)/kernel/test.o \
 	$(BUILD)/kernel/isa.o \
+	$(BUILD)/kernel/sb16.o \
 	$(BUILD)/fs/super.o \
 	$(BUILD)/fs/bmap.o \
 	$(BUILD)/fs/inode.o \

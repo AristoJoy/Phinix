@@ -160,23 +160,28 @@ idx_t bmap(inode_t *inode, idx_t block, bool create)
     int divider = 1;
 
     // 直接块不做处理
-
-    if (DIRECT_BLOCK <= block && block < INDIRECT1_BLOCK)
+    if (block < DIRECT_BLOCK)
     {
-        block -= DIRECT_BLOCK;
+        goto reckon;
+    }
+    
+    block -= DIRECT_BLOCK;
+
+    if (block < INDIRECT1_BLOCK)
+    {
         index = DIRECT_BLOCK;
         level = 1;
         divider = 1;
-    }
-    else if (block >= INDIRECT1_BLOCK)
-    {
-        block -= DIRECT_BLOCK + INDIRECT1_BLOCK;
-        assert(block < INDIRECT2_BLOCK);
-        index = DIRECT_BLOCK + 1;
-        level = 2;
-        divider = BLOCK_INDEXES;
+        goto reckon;
     }
 
+    block -= INDIRECT1_BLOCK;
+    assert(block < INDIRECT2_BLOCK);
+    index = DIRECT_BLOCK + 1;
+    level = 2;
+    divider = BLOCK_INDEXES;
+
+reckon:
     for (; level >= 0; level--)
     {
         // 如果不存在且create则申请一个文件块
