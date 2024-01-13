@@ -2,13 +2,14 @@
 #include <phinix/string.h>
 #include <phinix/assert.h>
 
-#define ZERO_PAD 1 // 填充0
-#define SIGN 2     // signed long
-#define PLUS 4     // 显示符号位
-#define SPACE 8    // 如果不显示符号位，则显示空格
-#define LEFT 16    // 左对齐
-#define SPECIAL 32 // 特殊进制
-#define SMALL 64   // 小写字母
+#define ZERO_PAD 0x01 // 填充0
+#define SIGN 0x02     // signed long
+#define PLUS 0x04     // 显示符号位
+#define SPACE 0x08    // 如果不显示符号位，则显示空格
+#define LEFT 0x10     // 左对齐
+#define SPECIAL 0x20  // 特殊进制
+#define SMALL 0x40    // 小写字母
+#define DOUBLE 0x80   // 浮点数
 
 #define is_digit(c) ((c) >= '0' && (c) <= '9')
 
@@ -31,7 +32,7 @@ static int skip_atoi(const char **s)
  * precision - 数字长度(精度)
  * flags - 标志位
  */
-static char *number(char *str, unsigned long num, int base, int size, int precision, int flags)
+static char *number(char *str, u32 *num, int base, int size, int precision, int flags)
 {
     char pad, sign, tmp[36];
     const char *chm = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -60,10 +61,15 @@ static char *number(char *str, unsigned long num, int base, int size, int precis
     pad = (flags & ZERO_PAD) ? '0' : ' ';
 
     // 如果指定了有符号数，且数值小于0，则输出-，且将值转化为正数
-    if ((flags & SIGN) && ((long)num) < 0)
+    if (flags & DOUBLE && (*(double *)(num)) < 0)
     {
         sign = '-';
-        num = -(long)num;
+        *(double *)(num) = -(*(double *)(num));
+    }
+    else if ((flags & SIGN) && !(flags & DOUBLE) && ((int)(*num)) < 0)
+    {
+        sign = '-';
+        num = -(int)(*num);
     }
     // 如果指定了输出符号位，则输出+；否则指定了空格，则输出空格到符号位；否则置0
     else
@@ -92,16 +98,36 @@ static char *number(char *str, unsigned long num, int base, int size, int precis
 
     // 下面数值转换为字符串倒序保存到数组里
     i = 0;
-    if (num == 0)
+    if (flags & DOUBLE)
+    {
+        u32 ival = (u32)(*(double *)num);
+        u32 fval = (u32)(((*(double *)num) - ival) * 1000000);
+        do
+        {
+            index = (fval) % base;
+            (fval) /= base;
+            tmp[i++] = chm[index];
+        } while (fval);
+        tmp[i++] = '.';
+
+        do
+        {
+            index = (ival) % base;
+            (ival) /= base;
+            tmp[i++] = chm[index];
+        } while (ival);
+        
+    }
+    else if ((*num) == 0)
     {
         tmp[i++] = '0';
     }
     else
     {
-        while (num != 0)
+        while ((*num) != 0)
         {
-            index = num % base;
-            num /= base;
+            index = (*num) % base;
+            (*num) /= base;
             tmp[i++] = chm[index];
         }
     }
@@ -161,7 +187,7 @@ static char *number(char *str, unsigned long num, int base, int size, int precis
     {
         *ptr++ = '0';
     }
-    
+
     // 输出数字
     while (i-- > 0)
     {
@@ -191,6 +217,7 @@ int vsprintf(char *buf, const char *fmt, va_list args)
     int field_width; // 输出字段宽度
     int precision;   // 最小数字输出长度或最大字符串个数
     int qualifier;   // h, l或L 用于整数字段
+    u32 num;
 
     // 首先将字符指针指向 buf
     // 然后扫描格式字符串，
@@ -349,7 +376,8 @@ int vsprintf(char *buf, const char *fmt, va_list args)
             break;
             // 将无符号的整数转换为无符号八进制
         case 'o':
-            str = number(str, va_arg(args, unsigned long), 8, field_width, precision, flags);
+            num = va_arg(args, unsigned long);
+            str = number(str, &num, 8, field_width, precision, flags);
             break;
             // 如果格式转换符是'p'，表示对应参数的一个指针类型
         case 'p':
@@ -359,7 +387,8 @@ int vsprintf(char *buf, const char *fmt, va_list args)
                 precision = 8;
                 flags |= ZERO_PAD;
             }
-            str = number(str, (unsigned long)va_arg(args, void *), 16, field_width, precision, flags);
+            num = va_arg(args, unsigned long);
+            str = number(str, &num, 16, field_width, precision, flags);
             break;
             // 若格式转换指示是 'x' 或 'X'
             // 则表示对应参数需要打印成十六进制数输出
@@ -367,7 +396,8 @@ int vsprintf(char *buf, const char *fmt, va_list args)
             // 小写16进制输出
             flags |= SMALL;
         case 'X':
-            str = number(str, va_arg(args, unsigned long), 16, field_width, precision, flags);
+            num = va_arg(args, unsigned long);
+            str = number(str, &num, 16, field_width, precision, flags);
             break;
             // 如果格式转换字符是'd', 'i' 或 'u'，则表示对应参数是整数
         case 'd':
@@ -376,12 +406,19 @@ int vsprintf(char *buf, const char *fmt, va_list args)
             flags |= SIGN;
             // 无符号10进制输出
         case 'u':
-            str = number(str, va_arg(args, unsigned long), 10, field_width, precision, flags);
+            num = va_arg(args, unsigned long);
+            str = number(str, &num, 10, field_width, precision, flags);
             break;
             // 表示要把到目前为止转换输出的字符数保存到对应参数指针指定的位置中
         case 'n':
             ip = va_arg(args, int *);
             *ip = (str - buf);
+            break;
+        case 'f':
+            flags |= SIGN;
+            flags |= DOUBLE;
+            double num = va_arg(args, double);
+            str = number(str, (u32 *)&num, 10, field_width, precision, flags);
             break;
         default:
             // 若格式转换符不是 '%'，则表示格式字符串有错
@@ -411,7 +448,7 @@ int vsprintf(char *buf, const char *fmt, va_list args)
     i = str - buf;
 
     assert(i < 1024);
-    
+
     return i;
 }
 int sprintf(char *buf, const char *fmt, ...)
