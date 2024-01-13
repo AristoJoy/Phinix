@@ -50,6 +50,14 @@ timer_t *timer_add(u32 expire_ms, handler_t handler, void *arg)
     return timer;
 }
 
+// 更新定时器超时
+void timer_update(timer_t *timer, u32 expire_ms)
+{
+    list_remove(&timer->node);
+    timer->expires = jiffies + expire_ms / jiffy;
+    list_insert_sort(&timer_list, &timer->node, element_node_offset(timer_t, node, expires));
+}
+
 u32 timer_expires()
 {
     if (list_empty(&timer_list))
@@ -59,6 +67,19 @@ u32 timer_expires()
     timer_t *timer = element_entry(timer_t, node, timer_list.head.next);
     return timer->expires;
 }
+
+// 获取超时时间片
+int timer_expire_jiffies(u32 expire_ms)
+{
+    return jiffies + expire_ms / jiffy;
+}
+
+// 判断是否超时
+bool timer_is_expires(u32 exipres)
+{
+    return jiffies > exipres;
+}
+
 
 // 定时器初始化
 void timer_init()

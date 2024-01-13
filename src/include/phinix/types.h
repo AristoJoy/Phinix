@@ -2,8 +2,9 @@
 #define PHINIX_TYPES_H
 
 #include <phinix/phinix.h>
+#include <phinix/errno.h>
 
-#define EOF -1 // end of file
+#define EOF -EEOF // end of file
 
 #define NULL ((void *)0) // 空指针
 

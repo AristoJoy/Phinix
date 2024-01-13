@@ -680,7 +680,7 @@ void page_fault(
     // 导致缺页异常的地址从cr2寄存器中获取
     u32 vaddr = get_cr2();
 
-    LOGK("fault address 0x%p...\n", vaddr);
+    LOGK("fault address 0x%p eip 0x%p...\n", vaddr, eip);
 
     // 转换错误码
     page_error_code_t *code = (page_error_code_t *)&error;
