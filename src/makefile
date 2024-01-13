@@ -108,6 +108,7 @@ $(BUILD)/kernel.bin: \
 	$(BUILD)/kernel/cpu.o \
 	$(BUILD)/kernel/fpu.o \
 	$(BUILD)/kernel/test.o \
+	$(BUILD)/kernel/isa.o \
 	$(BUILD)/fs/super.o \
 	$(BUILD)/fs/bmap.o \
 	$(BUILD)/fs/inode.o \
