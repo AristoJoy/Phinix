@@ -112,6 +112,7 @@ $(BUILD)/kernel.bin: \
 	$(BUILD)/kernel/isa.o \
 	$(BUILD)/kernel/sb16.o \
 	$(BUILD)/kernel/floppy.o \
+	$(BUILD)/kernel/pci.o \
 	$(BUILD)/fs/super.o \
 	$(BUILD)/fs/bmap.o \
 	$(BUILD)/fs/inode.o \

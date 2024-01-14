@@ -13,6 +13,7 @@ extern void clock_init();
 extern void syscall_init();
 extern void task_init();
 extern void fpu_init();
+extern void pci_init();
 
 void kernel_init()
 {
@@ -25,6 +26,7 @@ void kernel_init()
     timer_init();     // 初始化定时器
     clock_init();     // 初始化时钟
     fpu_init();       // 初始化 FPU 浮点运算单元
+    pci_init();       // 初始化 PCI 总线
 
     syscall_init(); // 初始化系统调用
     task_init();    // 初始化任务
