@@ -86,6 +86,11 @@ void link_page(u32 vaddr);
 // 去掉vaddr对应的物理内存映射
 void unlink_page(u32 vaddr);
 
+// 映射物理内存页
+void map_page(u32 vaddr, u32 paddr);
+// 映射物理内存区域
+void map_area(u32 paddr, u32 size);
+
 // 拷贝pde
 page_entry_t *copy_pde();
 

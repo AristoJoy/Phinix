@@ -451,6 +451,40 @@ void unlink_page(u32 vaddr)
     flush_tlb(vaddr);
 }
 
+// 映射物理内存页
+void map_page(u32 vaddr, u32 paddr)
+{
+    ASSERT_PAGE(vaddr);
+    ASSERT_PAGE(paddr);
+
+    page_entry_t *entry = get_entry(vaddr, true);
+    if (entry->present)
+    {
+        return;
+    }
+    
+    if (!paddr)
+    {
+        paddr = get_page();
+    }
+    
+    entry_init(entry, IDX(paddr));
+    flush_tlb(vaddr);
+}
+
+// 映射物理内存区域
+void map_area(u32 paddr, u32 size)
+{
+    ASSERT_PAGE(paddr);
+    u32 page_count = div_round_up(size, PAGE_SIZE);
+    for (size_t i = 0; i < page_count; i++)
+    {
+        map_page(paddr + i * PAGE_SIZE, paddr + i * PAGE_SIZE);
+    }
+    LOGK("Map memory 0x%p size 0x%X\n", paddr, size);
+}
+
+
 // 拷贝一页，返回物理地址
 static u32 copy_page(void *page)
 {
@@ -481,7 +515,7 @@ page_entry_t *copy_pde()
     page_entry_t *entry = NULL;
 
     // 前面是内核态内存，下面拷贝的是用户态的页目录
-    for (size_t didx = (sizeof(KERNEL_PAGE_TABLE) / 4); didx < 1023; didx++)
+    for (size_t didx = (sizeof(KERNEL_PAGE_TABLE) / 4); didx < (USER_STACK_TOP >> 22); didx++)
     {
         dentry = &pde[didx];
         if (!dentry->present)
@@ -540,7 +574,7 @@ void free_pde()
 
     page_entry_t *pde = get_pde();
 
-    for (size_t didx = (sizeof(KERNEL_PAGE_TABLE) / 4); didx < 1023; didx++)
+    for (size_t didx = (sizeof(KERNEL_PAGE_TABLE) / 4); didx < (USER_STACK_TOP >> 22); didx++)
     {
         page_entry_t *dentry = &pde[didx];
         if (!dentry->present)
