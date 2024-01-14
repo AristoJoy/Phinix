@@ -71,17 +71,17 @@ device_t *device_get(dev_t dev)
 }
 
 // 执行块设备请求
-void do_request(request_t *req)
+static int do_request(request_t *req)
 {
     LOGK("dev %d do request idx %d\n", req->dev, req->idx);
 
     switch (req->type)
     {
     case REQ_READ:
-        device_read(req->dev, req->buf, req->count, req->idx, req->flags);
+        return device_read(req->dev, req->buf, req->count, req->idx, req->flags);
         break;
     case REQ_WRITE:
-        device_write(req->dev, req->buf, req->count, req->idx, req->flags);
+        return device_write(req->dev, req->buf, req->count, req->idx, req->flags);
         break;
     default:
         panic("req type %d unknown!!!", req->type);
@@ -122,7 +122,7 @@ static request_t *reguest_nextreq(device_t *device, request_t *req)
 }
 
 // 块设备请求
-void device_request(dev_t dev, void *buf, u8 count, idx_t idx, int flags, u32 type)
+err_t device_request(dev_t dev, void *buf, u8 count, idx_t idx, int flags, u32 type)
 {
     device_t *device = device_get(dev);
     assert(device->type == DEV_BLOCK); // 是块设备
@@ -154,10 +154,10 @@ void device_request(dev_t dev, void *buf, u8 count, idx_t idx, int flags, u32 ty
     if (!empty)
     {
         req->task = running_task();
-        task_block(req->task, NULL, TASK_BLOCKED, TIMELESS);
+        assert(task_block(req->task, NULL, TASK_BLOCKED, TIMELESS) == EOK);
     }
 
-    do_request(req);
+    err_t ret = do_request(req);
 
     request_t *next_req = reguest_nextreq(device, req);
 
@@ -170,6 +170,8 @@ void device_request(dev_t dev, void *buf, u8 count, idx_t idx, int flags, u32 ty
         assert(next_req->task->magic == PHINIX_MAGIC);
         task_unblock(next_req->task, EOK);
     }
+
+    return ret;
 }
 // 设备控制
 int device_ioctl(dev_t dev, int cmd, void *args, int flags)
