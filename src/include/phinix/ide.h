@@ -46,14 +46,15 @@ typedef struct ide_part_t
 // IDE 磁盘
 typedef struct ide_disk_t
 {
-    char name[8];            // 磁盘名称
-    struct ide_ctrl_t *ctrl; // 控制器指针
-    u8 selector;             // 磁盘选择
-    bool master;             // 主盘
-    u32 total_lba;           // 可用扇区数量
-    u32 cylinders;           // 柱面数
-    u32 heads;               // 磁头数
-    u32 sectors;             // 扇区数
+    char name[8];                  // 磁盘名称
+    struct ide_ctrl_t *ctrl;       // 控制器指针
+    u8 selector;                   // 磁盘选择
+    bool master;                   // 主盘
+    u32 total_lba;                 // 可用扇区数量
+    u32 cylinders;                 // 柱面数
+    u32 heads;                     // 磁头数
+    u32 sectors;                   // 扇区数
+    u32 interface;                 // 磁盘类型
     ide_part_t parts[IDE_PART_NR]; // 硬盘分区
 } ide_disk_t;
 
