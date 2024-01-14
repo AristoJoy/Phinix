@@ -97,4 +97,7 @@ page_entry_t *copy_pde();
 // 释放页目录
 void free_pde();
 
+// 获取虚拟地址 varrd 对应的物理地址
+u32 get_paddr(u32 vaddr);
+
 #endif

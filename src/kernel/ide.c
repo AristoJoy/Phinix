@@ -11,6 +11,7 @@
 #include <phinix/device.h>
 #include <phinix/timer.h>
 #include <phinix/errno.h>
+#include <phinix/pci.h>
 
 #define LOGK(fmt, args...) DEBUGK(fmt, ##args)
 
@@ -43,6 +44,8 @@
 #define IDE_CMD_WRITE 0x30      // 写命令
 #define IDE_CMD_IDENTIFY 0xEC   // IDENTIFY命令
 #define IDE_CMD_DIAGNOSTIC 0x90 // 诊断命令
+#define IDE_CMD_READ_UDMA 0xC8  // UDMA 读命令
+#define IDE_CMD_WRITE_UDMA 0xCA // UDMA 写命令
 
 // IDE 控制器状态寄存器偏移
 #define IDE_SR_NULL 0x00 // NULL
@@ -77,6 +80,27 @@
 #define IDE_INTERFACE_UNKNOWN 0
 #define IDE_INTERFACE_ATA 1
 #define IDE_INTERFACE_ATAPI 2
+
+// 总线主控寄存器偏移
+#define BM_COMMAND_REG 0 // 命令寄存器偏移
+#define BM_STATUS_REG 2  // 状态寄存器偏移
+#define BM_PRD_ADDR 4    // PRD 地址寄存器偏移
+
+// 总线主控命令寄存器命令
+#define BM_CR_STOP 0x00  // 停止传输
+#define BM_CR_START 0x01 // 开始传输
+#define BM_CR_WRITE 0x00 // 主控写磁盘
+#define BM_CR_READ 0x08  // 主控读磁盘
+
+// 总线主控状态寄存器
+#define BM_SR_ACT 0x01     // 激活
+#define BM_SR_ERR 0x02     // 错误
+#define BM_SR_INT 0x04     // 中断信号生成
+#define BM_SR_DRV0 0x20    // 驱动器0 可以使用DMA
+#define BM_SR_DRV1 0x40    // 驱动器1 可以使用DMA
+#define BM_SR_SIMPLEX 0x80 // 仅单纯形操作
+
+#define IDE_LAST_PRD 0x80000000 // 最后一个PRD描述符
 
 // 分区文件系统
 // 参考 https://www.win.tue.nl/~aeb/partitions/partition_types-1.html
@@ -429,6 +453,120 @@ int ide_pio_part_write(ide_part_t *part, void *buf, u8 count, idx_t lba)
     return ide_pio_write(part->disk, buf, count, part->start + lba);
 }
 
+// 设置ide dma
+static void ide_setup_dma(ide_ctrl_t *ctrl, int cmd, char *buf, u32 len)
+{
+    // 保证没有跨页
+    assert(((u32)buf + len) <= ((u32)buf & (~0xfff)) + PAGE_SIZE);
+
+    // 设置 prdt
+    ctrl->prd.addr = get_paddr((u32)buf);
+    ctrl->prd.len = len | IDE_LAST_PRD;
+
+    // 设置 prd 地址
+    out_dword(ctrl->bmbase + BM_PRD_ADDR, (u32)&ctrl->prd);
+
+    // 设置读写
+    out_byte(ctrl->bmbase + BM_COMMAND_REG, cmd | BM_CR_STOP);
+
+    // 设置中断和错误
+    out_byte(ctrl->bmbase + BM_STATUS_REG, in_byte(ctrl->bmbase + BM_STATUS_REG) | BM_SR_INT | BM_SR_ERR);
+}
+
+// 启动 DMA
+static void ide_start_dma(ide_ctrl_t *ctrl)
+{
+    out_byte(ctrl->bmbase + BM_COMMAND_REG, in_byte(ctrl->bmbase + BM_COMMAND_REG) | BM_CR_START);
+}
+
+// 停止 DMA
+static err_t ide_stop_dma(ide_ctrl_t *ctrl)
+{
+    out_byte(ctrl->bmbase + BM_COMMAND_REG, in_byte(ctrl->bmbase + BM_COMMAND_REG) & (~BM_CR_START));
+
+    // 获取 DMA 状态
+    u8 status = in_byte(ctrl->bmbase + BM_STATUS_REG);
+
+    // 清除中断和错误位
+    out_byte(ctrl->bmbase + BM_STATUS_REG, status | BM_SR_INT | BM_SR_ERR);
+
+    // 检测错误
+    if (status & BM_SR_ERR)
+    {
+        LOGK("IDe dma error %02X\n", status);
+        return -EIO;
+    }
+    return EOK;
+}
+
+// ide udma 读
+err_t ide_udma_read(ide_disk_t *disk, void *buf, u8 count, idx_t lba)
+{
+    LOGK("IDE dma read lba 0x%x\n", lba);
+
+    int ret = 0;
+    ide_ctrl_t *ctrl = disk->ctrl;
+
+    lock_acquire(&ctrl->lock);
+
+    // 设置 DMA
+    ide_setup_dma(ctrl, BM_CR_READ, buf, count * SECTOR_SIZE);
+
+    // 选择扇区
+    ide_select_sector(disk, lba, count);
+
+    // 设置 UDMA 读
+    out_byte(disk->ctrl->iobase + IDE_COMMAND, IDE_CMD_READ_UDMA);
+
+    ide_start_dma(ctrl);
+
+    disk->ctrl->waiter = running_task();
+    if ((ret = task_block(disk->ctrl->waiter, NULL, TASK_BLOCKED, IDE_TIMEOUT) < EOK))
+    {
+        LOGK("ide dma error occur!!! %d\n", ret);
+    }
+
+    assert(ide_stop_dma(ctrl) == EOK);
+
+    lock_release(&ctrl->lock);
+
+    return ret;
+}
+
+// ide udma 写
+err_t ide_udma_write(ide_disk_t *disk, void *buf, u8 count, idx_t lba)
+{
+    LOGK("IDE dma write lba 0x%x\n", lba);
+
+    int ret = 0;
+    ide_ctrl_t *ctrl = disk->ctrl;
+
+    lock_acquire(&ctrl->lock);
+
+    // 设置 DMA
+    ide_setup_dma(ctrl, BM_CR_WRITE, buf, count * SECTOR_SIZE);
+
+    // 选择扇区
+    ide_select_sector(disk, lba, count);
+
+    // 设置 UDMA 读
+    out_byte(disk->ctrl->iobase + IDE_COMMAND, IDE_CMD_WRITE_UDMA);
+
+    ide_start_dma(ctrl);
+
+    disk->ctrl->waiter = running_task();
+    if ((ret = task_block(disk->ctrl->waiter, NULL, TASK_BLOCKED, IDE_TIMEOUT) < EOK))
+    {
+        LOGK("ide dma error occur!!! %d\n", ret);
+    }
+
+    assert(ide_stop_dma(ctrl) == EOK);
+
+    lock_release(&ctrl->lock);
+
+    return ret;
+}
+
 // 探测设备
 static err_t ide_probe_device(ide_disk_t *disk)
 {
@@ -462,7 +600,6 @@ static int ide_interface_type(ide_disk_t *disk)
     {
         return IDE_INTERFACE_UNKNOWN;
     }
-    
 
     out_byte(disk->ctrl->iobase + IDE_HDDEVSEL, disk->selector & IDE_SEL_MASK);
     ide_delay();
@@ -580,7 +717,6 @@ static err_t ide_identify(ide_disk_t *disk, u16 *buf)
     {
         goto rollback;
     }
-    
 
     ide_params_t *params = (ide_params_t *)buf;
 
@@ -594,7 +730,6 @@ static err_t ide_identify(ide_disk_t *disk, u16 *buf)
 
     ide_fixstrings(params->model, sizeof(params->model));
     LOGK("disk %s model number %s\n", disk->name, params->model);
-
 
     if (params->total_lba == 0)
     {
@@ -617,6 +752,24 @@ rollback:
 // 磁盘控制器初始化
 static void ide_ctrl_init()
 {
+    int iotype = IDE_TYPE_PIO;
+    int bmbase = 0;
+
+    pci_device_t *device = pci_find_device_by_class(PCI_CLASS_STORAGE_IDE);
+    if (device)
+    {
+        pci_bar_t bar;
+        int ret = pci_find_bar(device, &bar, PCI_BAR_TYPE_IO);
+        assert(ret == EOK);
+
+        LOGK("find dev 0x%x io bar 0x%x size %d\n",
+             device, bar.iobase, bar.size);
+
+        pci_enable_busmastering(device);
+        iotype = IDE_TYPE_UDMA;
+        bmbase = bar.iobase;
+    }
+
     u16 *buf = (u16 *)alloc_kpage(1);
     for (size_t cidx = 0; cidx < IDE_CTRL_NR; cidx++)
     {
@@ -625,6 +778,8 @@ static void ide_ctrl_init()
         lock_init(&ctrl->lock);
         ctrl->active = NULL;
         ctrl->waiter = NULL;
+        ctrl->iotype = iotype;
+        ctrl->bmbase = bmbase + cidx * 8;
 
         if (cidx) // 从通道
         {
@@ -682,9 +837,18 @@ static void ide_ctrl_init()
 // 注册磁盘设备
 static void ide_install()
 {
+    void *read = ide_pio_read;
+    void *write = ide_pio_write;
+
     for (size_t cidx = 0; cidx < IDE_CTRL_NR; cidx++)
     {
         ide_ctrl_t *ctrl = &controllers[cidx];
+        if (ctrl->iotype == IDE_TYPE_UDMA)
+        {
+            read = ide_udma_read;
+            write = ide_udma_write;
+        }
+
         for (size_t didx = 0; didx < IDE_DISK_NR; didx++)
         {
             ide_disk_t *disk = &ctrl->disks[didx];
@@ -694,7 +858,7 @@ static void ide_install()
             }
             if (disk->interface == IDE_INTERFACE_ATA)
             {
-                dev_t dev = device_install(DEV_BLOCK, DEV_IDE_DISK, disk, disk->name, 0, ide_pio_ioctl, ide_pio_read, ide_pio_write);
+                dev_t dev = device_install(DEV_BLOCK, DEV_IDE_DISK, disk, disk->name, 0, ide_pio_ioctl, read, write);
                 for (size_t i = 0; i < IDE_PART_NR; i++)
                 {
                     ide_part_t *part = &disk->parts[i];
