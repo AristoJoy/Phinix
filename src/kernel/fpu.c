@@ -118,7 +118,7 @@ void fpu_init()
         // 设置异常处理函数，非常类似于中断
         set_exception_handler(INTR_NM, fpu_handler);
         // 设置cr0寄存器
-        set_cr0(get_cr0() | (CR0_EM | CR0_TS | CR0_NE));
+        set_cr0(get_cr0() | CR0_EM | CR0_TS | CR0_NE);
     }
     else
     {
