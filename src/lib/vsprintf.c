@@ -116,7 +116,6 @@ static char *number(char *str, u32 *num, int base, int size, int precision, int 
             (ival) /= base;
             tmp[i++] = chm[index];
         } while (ival);
-        
     }
     else if ((*num) == 0)
     {
@@ -218,6 +217,7 @@ int vsprintf(char *buf, const char *fmt, va_list args)
     int precision;   // 最小数字输出长度或最大字符串个数
     int qualifier;   // h, l或L 用于整数字段
     u32 num;
+    u8 *ptr;
 
     // 首先将字符指针指向 buf
     // 然后扫描格式字符串，
@@ -417,8 +417,36 @@ int vsprintf(char *buf, const char *fmt, va_list args)
         case 'f':
             flags |= SIGN;
             flags |= DOUBLE;
-            double num = va_arg(args, double);
-            str = number(str, (u32 *)&num, 10, field_width, precision, flags);
+            double dnum = va_arg(args, double);
+            str = number(str, (u32 *)&dnum, 10, field_width, precision, flags);
+            break;
+        case 'b': // binary
+            num = va_arg(args, unsigned long);
+            str = number(str, &num, 2, field_width, precision, flags);
+            break;
+        case 'm': // mac address
+            flags |= SMALL | ZERO_PAD;
+            ptr = va_arg(args, char *);
+            for (size_t t = 0; t < 6; t++, ptr++)
+            {
+                int num = *ptr;
+                str = number(str, &num, 16, 2, precision, flags);
+                *str = ':';
+                str++;
+            }
+            str--;
+            break;
+        case 'r': // ip address
+            flags |= SMALL;
+            ptr = va_arg(args, u8 *);
+            for (size_t t = 0; t < 4; t++, ptr++)
+            {
+                int num = *ptr;
+                str = number(str, &num, 10, field_width, precision, flags);
+                *str = '.';
+                str++;
+            }
+            str--;
             break;
         default:
             // 若格式转换符不是 '%'，则表示格式字符串有错
