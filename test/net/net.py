@@ -23,18 +23,18 @@ logger = logging.getLogger("net")
 
 
 rmac = '5a:5a:5a:5a:5a:44'
-raddr = '192.168.111.44'
+raddr = '192.168.31.44'
 
 lmac = '5a:5a:5a:5a:5a:33'
-laddr = '192.168.111.33'
+laddr = '192.168.31.33'
 
 bmac = '5a:5a:5a:5a:5a:22'
-baddr = '192.168.111.22'
+baddr = '192.168.31.131'
 
 hmac = '5a:5a:5a:5a:5a:11'
-haddr = '192.168.111.11'
+haddr = '192.168.31.128'
 
-gateway = '192.168.111.2'
+gateway = '192.168.31.2'
 gmac = None
 
 broadcast = "ff:ff:ff:ff:ff:ff"
