@@ -5,5 +5,7 @@
 #include <phinix/net/eth.h>
 #include <phinix/net/pubf.h>
 #include <phinix/net/chksum.h>
+#include <phinix/net/netif.h>
+#include <phinix/net/addr.h>
 
 #endif

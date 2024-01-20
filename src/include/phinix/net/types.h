@@ -19,4 +19,7 @@
 typedef u8 eth_addr_t[ETH_ADDR_LEN]; // MAC地址
 typedef u8 ip_addr_t[IP_ADDR_LEN]; // IPv4地址
 
+typedef struct netif_t netif_t;
+typedef struct pbuf_t pbuf_t;
+
 #endif

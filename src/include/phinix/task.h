@@ -146,4 +146,6 @@ void task_put_fd(task_t *task, fd_t fd);
 // 是否是进程组leader
 bool task_leader(task_t *task);
 
+task_t *task_create(target_t target, const char *name, u32 priority, u32 uid);
+
 #endif
