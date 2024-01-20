@@ -59,7 +59,7 @@ void list_pushback(list_t *list, list_node_t *node)
 list_node_t *list_popback(list_t *list)
 {
     assert(!list_empty(list));
-    list_node_t *node = &list->tail.prev;
+    list_node_t *node = list->tail.prev;
     list_remove(node);
 
     return node;
