@@ -14,6 +14,7 @@
 #include <phinix/stdlib.h>
 #include <phinix/printk.h>
 #include <phinix/errno.h>
+#include <phinix/net/pubf.h>
 
 #define LOGK(fmt, args...) DEBUGK(fmt, ##args)
 
@@ -190,9 +191,6 @@ enum ERR
     ERR_RXE = 1 << 7,  // RX Data Error
 };
 
-#define RX_DESC_NR 32 // 接收描述符数量
-#define TX_DESC_NR 32 // 传输描述符数量
-
 // 接收描述符
 typedef struct rx_desc_t
 {
@@ -217,6 +215,8 @@ typedef struct tx_desc_t
 } _packed tx_desc_t;
 
 #define NAME_LEN 16
+#define RX_DESC_NR 32 // 接收描述符数量
+#define TX_DESC_NR 32 // 传输描述符数量
 
 // e1000网卡
 typedef struct e1000_t
@@ -260,13 +260,21 @@ static void recv_packet(e1000_t *e1000)
         assert(rx->length < 1600);
 
         // TODO RECEIVE PACKET
-        eth_t *eth = (eth_t *)(u32)(rx->addr & 0xffffffff);
-        LOGK("ETH R [0x%04X]: %m -> %m, %d\n",
-             ntohs(eth->type),
-             eth->src,
-             eth->dst,
+        pbuf_t *pbuf = element_entry(pbuf_t, payload, rx->addr);
+        pbuf->length = rx->length;
+
+        // eth_t *eth = (eth_t *)(u32)(rx->addr & 0xffffffff);
+        LOGK("ETH R 0x%p [0x%04X]: %m -> %m, %d\n",
+             pbuf,
+             ntohs(pbuf->eth->type),
+             pbuf->eth->src,
+             pbuf->eth->dst,
              rx->length);
 
+        pbuf_put(pbuf);
+
+        pbuf = pbuf_get();
+        rx->addr = (u32)pbuf->payload;
         rx->status = 0;
 
         mem_out_dword(e1000->membase + E1000_RDT, e1000->rx_cur);
@@ -276,7 +284,7 @@ static void recv_packet(e1000_t *e1000)
 }
 
 // 发送数据包
-void send_packet(eth_t *eth, u16 len)
+void send_packet(pbuf_t *pbuf)
 {
     e1000_t *e1000 = &obj;
     tx_desc_t *tx = &e1000->tx_desc[e1000->tx_cur];
@@ -287,34 +295,23 @@ void send_packet(eth_t *eth, u16 len)
         assert(task_block(e1000->tx_waiter, NULL, TASK_BLOCKED, TIMELESS) == EOK);
     }
 
-    memcpy((void *)(u32)tx->addr, eth, len);
+    assert(pbuf->count == 1);
 
-    tx->length = len;
+    pbuf_put(element_entry(pbuf_t, payload, tx->addr));
+
+    tx->addr = (u32)pbuf->payload;
+    tx->length = pbuf->length;
     tx->cmd = TCMD_EOP | TCMD_RS | TCMD_RPS | TCMD_IFCS;
     tx->status = 0;
     e1000->tx_cur = (e1000->tx_cur + 1) % TX_DESC_NR;
     mem_out_dword(e1000->membase + E1000_TDT, e1000->tx_cur);
 
-    LOGK("ETH S [0x%04X]: %m -> %m, %d\n",
-         ntohs(eth->type),
-         eth->src,
-         eth->dst,
-         len);
-}
-
-// 发送测试数据包
-void test_e1000_send_packet()
-{
-    e1000_t *e1000 = &obj;
-    eth_t *eth = (eth_t *)alloc_kpage(1);
-    memcpy(eth->src, e1000->mac, 6);
-    memcpy(eth->dst, "\xff\xff\xff\xff\xff\xff", 6);
-    eth->type = 0x0090; // LOOP 0x9000
-
-    int len = 1500;
-    memset(eth->payload, 'A', len);
-    send_packet(eth, len + sizeof(eth_t));
-    free_kpage((u32)eth, 1);
+    LOGK("ETH S 0x%p [0x%04X]: %m -> %m, %d\n",
+         pbuf,
+         ntohs(pbuf->eth->type),
+         pbuf->eth->src,
+         pbuf->eth->dst,
+         pbuf->length);
 }
 
 // 中断处理函数
@@ -336,7 +333,6 @@ static void e1000_handler(int vector)
             task_unblock(e1000->tx_waiter, EOK);
             e1000->tx_waiter = NULL;
         }
-        
     }
 
     // 传输队列为空，并且传输进程阻塞
@@ -363,12 +359,12 @@ static void e1000_handler(int vector)
     {
         LOGK("e1000 RXDMT0...\n");
     }
-    
+
     if (status & IM_RXT0)
     {
         recv_packet(e1000);
     }
-    
+
     // 去掉一直中断状态，其他的如果发生了再说
     status &= ~IM_TXDW & ~IM_TXQE & ~IM_LSC & ~IM_RXO;
     status &= ~IM_RXDMT0 & ~IM_RXT0;
@@ -398,9 +394,7 @@ static void e1000_eeprom_detect(e1000_t *e1000)
         {
             e1000->eeprom = false;
         }
-        
     }
-    
 }
 
 // 读取只读存储器
@@ -412,7 +406,6 @@ static u16 e1000_eeprom_read(e1000_t *e1000, u8 addr)
         mem_out_dword(e1000->membase + E1000_EERD, 1 | (u32)addr << 8);
         while (!((tmp = mem_in_dword(e1000->membase + E1000_EERD)) & (1 << 4)))
             ;
-        
     }
     else
     {
@@ -429,7 +422,7 @@ static void e1000_read_mac(e1000_t *e1000)
     e1000_eeprom_detect(e1000);
     if (e1000->eeprom)
     {
-        u16 value; 
+        u16 value;
         value = e1000_eeprom_read(e1000, 0);
         e1000->mac[0] = value & 0xFF;
         e1000->mac[1] = value >> 8;
@@ -449,7 +442,6 @@ static void e1000_read_mac(e1000_t *e1000)
         {
             e1000->mac[i] = mac[i];
         }
-        
     }
     LOGK("e1000 MAC: %m\n", e1000->mac);
 }
@@ -460,11 +452,11 @@ static void e1000_reset(e1000_t *e1000)
     e1000_read_mac(e1000);
 
     // 初始化组播表数组
-    for (int i = E1000_MAT0; i < E1000_MAT1; i+= 4)
+    for (int i = E1000_MAT0; i < E1000_MAT1; i += 4)
     {
         mem_out_dword(e1000->membase + i, 0);
     }
-    
+
     // 禁用中断
     mem_out_dword(e1000->membase + E1000_IMS, 0);
 
@@ -472,6 +464,7 @@ static void e1000_reset(e1000_t *e1000)
     e1000->rx_desc = (rx_desc_t *)alloc_kpage(1); // TODO : free
     e1000->rx_cur = 0;
     mem_out_dword(e1000->membase + E1000_RDBAL, (u32)e1000->rx_desc);
+    mem_out_dword(e1000->membase + E1000_RDBAH, 0);
     mem_out_dword(e1000->membase + E1000_RDLEN, sizeof(rx_desc_t) * RX_DESC_NR);
 
     // 接收描述符头尾指针
@@ -481,7 +474,7 @@ static void e1000_reset(e1000_t *e1000)
     // 接收描述符地址
     for (size_t i = 0; i < RX_DESC_NR; i++)
     {
-        e1000->rx_desc[i].addr = alloc_kpage(1); // TODO : free
+        e1000->rx_desc[i].addr = (u32)pbuf_get()->payload;
         e1000->rx_desc[i].status = 0;
     }
 
@@ -496,6 +489,7 @@ static void e1000_reset(e1000_t *e1000)
     e1000->tx_desc = (tx_desc_t *)alloc_kpage(1); // TODO : free
     e1000->tx_cur = 0;
     mem_out_dword(e1000->membase + E1000_TDBAL, (u32)e1000->tx_desc);
+    mem_out_dword(e1000->membase + E1000_TDBAH, 0);
     mem_out_dword(e1000->membase + E1000_TDLEN, sizeof(tx_desc_t) * TX_DESC_NR);
 
     // 传输描述符头尾指针
@@ -505,7 +499,7 @@ static void e1000_reset(e1000_t *e1000)
     // 传输描述符基地址
     for (size_t i = 0; i < TX_DESC_NR; i++)
     {
-        e1000->tx_desc[i].addr = alloc_kpage(1); // TODO : free
+        e1000->tx_desc[i].addr = (u32)pbuf_get()->payload;
         e1000->tx_desc[i].status = TS_DD;
     }
 
