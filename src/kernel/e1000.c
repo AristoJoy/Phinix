@@ -15,6 +15,7 @@
 #include <phinix/printk.h>
 #include <phinix/errno.h>
 #include <phinix/net/pubf.h>
+#include <phinix/net/chksum.h>
 
 #define LOGK(fmt, args...) DEBUGK(fmt, ##args)
 
@@ -298,6 +299,11 @@ void send_packet(pbuf_t *pbuf)
     assert(pbuf->count == 1);
 
     pbuf_put(element_entry(pbuf_t, payload, tx->addr));
+
+    // Ethernet checksum
+    u32 sum = eth_fcs((char *)pbuf->payload, pbuf->length);
+    *(u32 *)((u32)pbuf->payload + pbuf->length) = sum;
+    pbuf->length += ETH_FCS_LEN;
 
     tx->addr = (u32)pbuf->payload;
     tx->length = pbuf->length;

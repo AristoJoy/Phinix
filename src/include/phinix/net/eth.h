@@ -3,7 +3,7 @@
 
 #include <phinix/net/types.h>
 
-#define ETH_CRC_LEN 4
+#define ETH_FCS_LEN 4
 
 // 以太网帧
 typedef struct eth_t

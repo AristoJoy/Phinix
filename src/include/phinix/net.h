@@ -4,5 +4,6 @@
 #include <phinix/net/types.h>
 #include <phinix/net/eth.h>
 #include <phinix/net/pubf.h>
+#include <phinix/net/chksum.h>
 
 #endif
