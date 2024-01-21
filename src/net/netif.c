@@ -45,7 +45,7 @@ netif_t *netif_get()
     {
         return NULL;
     }
-    
+
     list_node_t *ptr = list->head.next;
     netif_t *netif = element_entry(netif_t, node, ptr);
     return netif;
@@ -66,7 +66,6 @@ void netif_input(netif_t *netif, pbuf_t *pbuf)
     {
         task_unblock(neti_task, EOK);
     }
-    
 }
 
 // 网卡接收任务输出
@@ -88,7 +87,7 @@ static void neti_thread()
     while (true)
     {
         int count = 0;
-        for(list_node_t *ptr = list->head.next; ptr != &list->tail; ptr = ptr->next)
+        for (list_node_t *ptr = list->head.next; ptr != &list->tail; ptr = ptr->next)
         {
             netif = element_entry(netif_t, node, ptr);
 
@@ -98,28 +97,24 @@ static void neti_thread()
                 assert(!pbuf->node.next && !pbuf->node.prev);
 
                 LOGK("ETH RECV [%04X]: %m -> %m %d\n",
-                    ntohs(pbuf->eth->type),
-                    pbuf->eth->src,
-                    pbuf->eth->dst,
-                    pbuf->length);
+                     ntohs(pbuf->eth->type),
+                     pbuf->eth->src,
+                     pbuf->eth->dst,
+                     pbuf->length);
 
                 pbuf_put(pbuf);
                 count++;
             }
-
-            // 没有数据包，阻塞处理线程
-            if (!count)
-            {
-                task_t *task = running_task();
-                assert(task == neti_task);
-                int ret = task_block(task, NULL, TASK_WAITING, TIMELESS);
-                assert(ret == EOK);
-            }
-            
-            
+        }
+        // 没有数据包，阻塞处理线程
+        if (!count)
+        {
+            task_t *task = running_task();
+            assert(task == neti_task);
+            int ret = task_block(task, NULL, TASK_WAITING, TIMELESS);
+            assert(ret == EOK);
         }
     }
-    
 }
 
 // 发送任务
@@ -150,15 +145,14 @@ static void neto_thread()
 
                 count++;
             }
-
-            // 没有数据包，阻塞处理线程
-            if (!count)
-            {
-                task_t *task = running_task();
-                assert(task == neto_task);
-                int ret = task_block(task, NULL, TASK_WAITING, TIMELESS);
-                assert(ret == EOK);
-            }
+        }
+        // 没有数据包，阻塞处理线程
+        if (!count)
+        {
+            task_t *task = running_task();
+            assert(task == neto_task);
+            int ret = task_block(task, NULL, TASK_WAITING, TIMELESS);
+            assert(ret == EOK);
         }
     }
 }
