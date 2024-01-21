@@ -7,5 +7,6 @@
 #include <phinix/net/chksum.h>
 #include <phinix/net/netif.h>
 #include <phinix/net/addr.h>
+#include <phinix/net/arp.h>
 
 #endif
