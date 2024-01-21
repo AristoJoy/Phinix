@@ -16,6 +16,11 @@ enum
 #define ARP_PROTOCAL_IP 0x0800 // ARP 协议 IP
 #define ARP_PROTOCAL_IP_LEN 4 // ARP IP 地址长度 4
 
+#define ARP_ENTRY_TIMEOUT 600 // ARP 缓冲失效时间
+#define ARP_RETRY 5 // ARP 请求重试次数
+#define ARP_DELAY 2 // ARP 请求延迟秒
+#define ARP_REFRESH_DELAY 1000 // ARP 刷新间隔毫秒
+
 // arp数据包
 typedef struct arp_t
 {
@@ -32,5 +37,6 @@ typedef struct arp_t
 
 // 获取arp数据
 err_t arp_input(netif_t *netif, pbuf_t *pbuf);
+err_t arp_eth_output(netif_t *netif, pbuf_t *pbuf, ip_addr_t addr, u16 type, u32 len);
 
 #endif

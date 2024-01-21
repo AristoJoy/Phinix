@@ -1,6 +1,7 @@
 #include <phinix/types.h>
 #include <phinix/cpu.h>
 #include <phinix/printk.h>
+#include <phinix/assert.h>
 #include <phinix/debug.h>
 #include <phinix/errno.h>
 #include <phinix/string.h>
@@ -16,5 +17,8 @@ err_t sys_test()
 
     int len = 1500;
     memset(pbuf->eth->payload, 'A', len);
-    eth_output(netif, pbuf, "\xff\xff\xff\xff\xff\x00", 0x9000, len);
+    
+    ip_addr_t addr;
+    assert(inet_aton("192.168.31.1", addr) == EOK);
+    arp_eth_output(netif, pbuf, addr, 0x9000, len);
 }

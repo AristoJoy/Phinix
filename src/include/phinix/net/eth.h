@@ -6,6 +6,9 @@
 
 #define ETH_FCS_LEN 4
 
+#define ETH_BROADCAST "\xff\xff\xff\xff\xff\xff"
+#define ETH_ANY "\x00\x00\x00\x00\x00\x00"
+
 enum
 {
     ETH_TYPE_IP = 0x0800,   // IPv4 协议
