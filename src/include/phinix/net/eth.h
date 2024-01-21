@@ -5,6 +5,13 @@
 
 #define ETH_FCS_LEN 4
 
+enum
+{
+    ETH_TYPE_IP = 0x0800, // IPv4 协议
+    ETH_TYPE_ARP = 0x0806, // ARP 协议
+    ETH_TYPE_IPV6 = 0x86DD, // IPv6 协议
+};
+
 // 以太网帧
 typedef struct eth_t
 {
@@ -14,5 +21,9 @@ typedef struct eth_t
     u8 payload[0]; // 载荷
 } _packed eth_t;
 
+// 接收以太网帧
+err_t eth_input(netif_t *netif, pbuf_t *pbuf);
+// 发送以太网帧
+err_t eth_output(netif_t *netif, pbuf_t *pbuf, eth_addr_t dst, u16 type, u32 len);
 
 #endif

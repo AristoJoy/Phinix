@@ -123,6 +123,7 @@ $(BUILD)/kernel.bin: \
 	$(BUILD)/net/chksum.o \
 	$(BUILD)/net/netif.o \
 	$(BUILD)/net/addr.o \
+	$(BUILD)/net/eth.o \
 	$(BUILD)/fs/super.o \
 	$(BUILD)/fs/bmap.o \
 	$(BUILD)/fs/inode.o \
