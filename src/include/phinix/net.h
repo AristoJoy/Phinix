@@ -9,5 +9,6 @@
 #include <phinix/net/addr.h>
 #include <phinix/net/arp.h>
 #include <phinix/net/ip.h>
+#include <phinix/net/icmp.h>
 
 #endif
