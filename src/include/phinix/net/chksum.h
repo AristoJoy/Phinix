@@ -6,6 +6,6 @@
 // 以太网校验和
 u32 eth_fcs(void *data, int len);
 // 校验
-u16 chksum(void *data, int len);
+u16 ip_chksum(void *data, int len);
 
 #endif

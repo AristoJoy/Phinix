@@ -30,6 +30,9 @@ netif_t *netif_setup(void *nic, eth_addr_t hwaddr, void *output);
 // 获取虚拟网卡
 netif_t *netif_get();
 
+// IP 路由选择
+netif_t *netif_route(ip_addr_t addr);
+
 // 移除虚拟网卡
 void netif_remove(netif_t *netif);
 

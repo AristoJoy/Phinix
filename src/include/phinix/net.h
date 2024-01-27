@@ -8,5 +8,6 @@
 #include <phinix/net/netif.h>
 #include <phinix/net/addr.h>
 #include <phinix/net/arp.h>
+#include <phinix/net/ip.h>
 
 #endif
